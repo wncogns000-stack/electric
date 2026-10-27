@@ -1,0 +1,9 @@
+{
+  "name": "electric-circuit-lab",
+  "version": "1.0.0",
+  "private": true,
+  "description": "초등 과학 전기 회로 가상 실험실",
+  "scripts": {
+    "test": "node --test"
+  }
+}

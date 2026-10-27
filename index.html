@@ -1,0 +1,91 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>전기 회로 실험실</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans+KR:wght@400;500;600&family=Jua&display=swap">
+<link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+<div class="app">
+  <header class="topbar">
+    <div class="brand">
+      <h1>전기 회로 실험실</h1>
+      <p>실험 도구를 테이블에 올리고 집게 달린 전선으로 이어 꼬마전구에 불을 켜 보세요.</p>
+    </div>
+    <div class="topbar-actions">
+      <label class="toggle" for="flowToggle">
+        <input type="checkbox" id="flowToggle">
+        <span class="toggle-track" aria-hidden="true"><span class="toggle-thumb"></span></span>
+        <span>전기가 흐르는 길 보기</span>
+      </label>
+      <button type="button" class="btn" id="clearBtn">모두 치우기</button>
+      <button type="button" class="btn btn-quiet" id="helpBtn" aria-haspopup="dialog">사용 방법</button>
+    </div>
+  </header>
+
+  <aside class="tools" aria-labelledby="toolsTitle">
+    <h2 id="toolsTitle" class="panel-title">실험 도구</h2>
+    <p class="panel-note">누르면 실험 테이블에 올라가요.</p>
+    <ul class="tool-list" id="toolList"></ul>
+  </aside>
+
+  <main class="bench">
+    <div class="bench-head">
+      <h2 class="panel-title">실험 테이블</h2>
+      <p class="status" id="status" role="status" aria-live="polite"></p>
+    </div>
+    <div class="stage" id="stage">
+      <svg id="table" class="table" role="application" aria-label="실험 테이블. 부품을 끌어서 옮기고, 집게를 금속 단자에 물려 회로를 만듭니다.">
+        <defs id="defs"></defs>
+        <rect class="mat" id="mat" x="0" y="0" width="1000" height="620"></rect>
+        <rect id="matMinor" x="0" y="0" width="1000" height="620" fill="url(#gridMinor)"></rect>
+        <rect id="matMajor" x="0" y="0" width="1000" height="620" fill="url(#gridMajor)"></rect>
+        <g id="layerParts"></g>
+        <g id="layerGlow" class="glow-layer"></g>
+        <g id="layerWires"></g>
+        <g id="layerTerms"></g>
+        <g id="layerClips"></g>
+      </svg>
+      <p class="empty-hint" id="emptyHint">‘실험 도구’에서 부품을 눌러 테이블에 올려 보세요.</p>
+      <div class="actionbar" id="actionbar" hidden></div>
+      <div class="toast" id="toast" role="status" aria-live="polite" hidden>
+        <span id="toastText"></span>
+        <button type="button" class="toast-action" id="toastAction" hidden></button>
+      </div>
+    </div>
+  </main>
+
+  <aside class="activities" aria-labelledby="actTitle">
+    <div class="activities-head">
+      <h2 id="actTitle" class="panel-title">실험 활동</h2>
+      <span class="progress" id="progress"></span>
+    </div>
+    <ol class="mission-list" id="missionList"></ol>
+    <button type="button" class="link-btn" id="resetMissions">활동 기록 지우기</button>
+  </aside>
+</div>
+
+<dialog class="help" id="helpDialog" aria-labelledby="helpTitle">
+  <div class="help-inner">
+    <h2 id="helpTitle">사용 방법</h2>
+    <ol class="help-steps">
+      <li><b>부품 올리기</b> 왼쪽 ‘실험 도구’에서 부품을 누르면 실험 테이블에 올라가요.</li>
+      <li><b>옮기기·돌리기</b> 부품을 끌어서 옮겨요. 부품을 한 번 누르면 돌리기, 치우기 단추가 나와요.</li>
+      <li><b>끼우기</b> 전지는 전지 끼우개 위로, 꼬마전구는 전구 끼우개 위로 끌어다 놓으면 끼워져요. 전지를 누른 다음 전지 끼우개를 눌러도 돼요.</li>
+      <li><b>전선 잇기</b> 집게 달린 전선의 집게를 끌어서 금속 부분에 물려요. 금속 부분 두 곳을 차례로 눌러도 테이블에 있는 전선으로 이어져요.</li>
+      <li><b>스위치</b> 스위치를 누르면 켜지고, 한 번 더 누르면 꺼져요.</li>
+    </ol>
+    <p class="help-safety"><b>안전</b> 실제 실험에서 전구 없이 전지의 (+)극과 (−)극을 전선으로 바로 이으면 전지와 전선이 뜨거워져 위험해요. 이 실험실에서는 그렇게 이으면 경고가 나타나요.</p>
+    <button type="button" class="btn btn-primary" id="helpClose">닫기</button>
+  </div>
+</dialog>
+
+<script src="js/circuit.js"></script>
+<script src="js/parts.js"></script>
+<script src="js/app.js"></script>
+</body>
+</html>
