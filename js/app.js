@@ -3,92 +3,73 @@
  *
  * 상태(state)를 고치면 update()를 불러 회로를 다시 계산하고 화면 전체를 다시 그린다.
  * 끌기는 SVG 루트가 포인터를 잡아서 처리하므로 다시 그려도 끌기가 끊기지 않는다.
+ * 차시(탭)마다 실험 테이블을 따로 둔다.
  */
 (function () {
   'use strict';
 
   var P = window.LabParts;
   var C = window.LabCircuit;
+  var LESSONS = window.LabLessons;
   var TYPES = P.TYPES;
 
-  var TOOL_ORDER = ['battery', 'holder', 'bulb', 'socket', 'switch', 'wire'];
   var WIRE_COLORS = ['#d2382d', '#26292c', '#e2b21c', '#2f6fd0', '#2e9a58'];
   var SNAP = 34;          // 집게를 놓았을 때 단자에 물리는 거리 (테이블 좌표)
+  var JOIN_SNAP = 46;     // 전지 끼우개끼리 붙는 거리
   var DRAG_START = 6;     // 이만큼(px) 움직여야 끌기로 본다
   var BASE_WIDTH = 1000;  // 화면 폭이 이만큼일 때 1배로 그린다
   var CLIP_ROOM = 36;     // 테이블 가장자리와 부품 사이에 집게가 들어갈 여유
+  var RING_REACH = 95;    // 전자석 끝과 둥근 철 고리 더미 사이가 이보다 가까우면 고리가 붙는다
+  var COMPASS_REACH = 170;
+  var EARTH = 1.5e-5;     // 나침반을 북쪽(화면 위)으로 돌리는 지구 자기장의 세기 (전자석과 같은 단위)
+  var LOADS = ['bulb', 'motor', 'buzzer', 'magnet'];
 
   var FIRST_HINTS = {
     battery: '전지는 전지 끼우개 위로 끌어다 놓으면 끼워져요.',
-    holder: '전지를 전지 끼우개 위로 끌어다 놓으면 끼워져요.',
-    bulb: '꼬마전구는 전구 끼우개 위로 끌어다 놓으면 끼워져요.',
-    socket: '꼬마전구를 전구 끼우개 위로 끌어다 놓으면 끼워져요.',
-    switch: '스위치를 누르면 켜지고, 한 번 더 누르면 꺼져요.',
-    wire: '집게를 끌어서 금속 부분에 물려 보세요.'
+    holder: '전지를 전지 끼우개 위로 끌어다 놓으면 끼워져요. 전지 끼우개끼리 끝을 맞대면 서로 붙어요.',
+    bulb: '전구는 전구 끼우개 위로 끌어다 놓으면 끼워져요.',
+    socket: '전구를 전구 끼우개 위로 끌어다 놓으면 끼워져요.',
+    switch: '스위치를 누르면 닫히고, 한 번 더 누르면 열려요.',
+    wire: '집게를 끌어서 금속 부분에 물려 보세요.',
+    rodPlastic: '막대의 양쪽 끝에 집게를 물려 보세요.',
+    rodRubber: '막대의 양쪽 끝에 집게를 물려 보세요.',
+    rodMetal: '막대의 양쪽 끝에 집게를 물려 보세요.',
+    motor: '전동기의 양쪽 단자에 집게를 물려 보세요.',
+    buzzer: '버저의 빨간색 전선은 (+)극 쪽에, 검은색 전선은 (−)극 쪽에 연결해요.',
+    magnet: '전자석 양쪽의 에나멜선 끝에 집게를 물려 보세요.',
+    rings: '전자석의 끝부분을 둥근 철 고리에 가까이 가져가 보세요.',
+    compass: '나침반을 전자석의 끝부분 가까이에 놓아 보세요.'
   };
 
-  var MISSIONS = [
-    {
-      id: 'light',
-      title: '꼬마전구에 불 켜기',
-      body: '전지, 꼬마전구, 집게 달린 전선으로 꼬마전구에 불을 켜 보세요.',
-      think: '꼬마전구의 어느 두 곳에 전선을 이어야 불이 켜질까요?',
-      check: function (r) { return litBulbs(r).length > 0; }
-    },
-    {
-      id: 'switch',
-      title: '스위치로 켜고 끄기',
-      body: '전지는 전지 끼우개에, 꼬마전구는 전구 끼우개에 끼우고 스위치를 넣어 회로를 만든 뒤 스위치로 불을 켜 보세요.',
-      think: '스위치를 끄면 왜 불이 꺼질까요?',
-      check: function (r) {
-        return state.parts.some(function (b) { return b.type === 'bulb' && b.socketId && r.bulbs[b.id].lit; }) &&
-          state.parts.some(function (s) { return s.type === 'switch' && s.closed && r.switches[s.id].current > 0.02; }) &&
-          state.parts.some(function (h) {
-            return h.type === 'holder' && h.batteryId && Math.abs(r.batteries[h.batteryId].current) > 0.02;
-          });
-      }
-    },
-    {
-      id: 'series',
-      title: '전구 2개 직렬연결',
-      body: '꼬마전구 2개를 한 줄로 이어 불을 켜 보세요.',
-      think: '전구 하나를 빼면 나머지 전구는 어떻게 될까요?',
-      check: function (r) { return pairShape(r) === 'series'; }
-    },
-    {
-      id: 'parallel',
-      title: '전구 2개 병렬연결',
-      body: '꼬마전구 2개를 두 갈래로 나누어 이어 불을 켜 보세요.',
-      think: '직렬연결과 비교하면 전구의 밝기는 어떤가요? 전구 하나를 빼면 어떻게 될까요?',
-      check: function (r) { return pairShape(r) === 'parallel'; }
-    },
-    {
-      id: 'cells',
-      title: '더 해 보기: 전지 2개 잇기',
-      body: '전지 2개를 한 줄로 이어 꼬마전구 1개에 불을 켜 보세요.',
-      think: '전지 1개일 때보다 밝은가요? 전지 하나의 방향을 바꾸면 어떻게 될까요?',
-      check: function (r) {
-        return litBulbs(r).some(function (b) { return r.bulbs[b.id].brightness > 2.5; });
-      }
-    }
-  ];
+  var lessonById = {};
+  LESSONS.forEach(function (l) { lessonById[l.id] = l; });
 
   var state = {
+    lessonId: LESSONS[0].id,
+    tables: {},       // 차시 id → { parts, wires }
     parts: [],
     wires: [],
     seq: 0,
     wireColor: 0,
     selected: null,   // { kind: 'part', id } | { kind: 'wire', id } | { kind: 'clip', wireId, end } | { kind: 'term', partId, term }
+    actionsOpen: false, // 선택한 것을 눌렀을 때만 단추 줄을 보여 준다 (끌고 난 뒤에는 숨긴다)
     showFlow: false,
-    done: {}
+    sound: true,
+    steps: {},        // '활동 id:관찰 id' → true
+    memo: {}          // 활동 id → 활동이 기억할 것
   };
   var view = { W: BASE_WIDTH, H: 620 };
   var result = C.solve([], []);
+  var fx = { attached: [], ringsLeft: {}, needles: {}, strong: {}, magnets: [] };
   var drag = null;
   var nearTerm = null;
   var hintsShown = {};
   var toastTimer = null;
   var justDone = null;
+  var rotorAngle = {};
+  var animId = null;
+  var animLast = null;
+  var audio = null;
 
   function $(id) { return document.getElementById(id); }
   var svg = $('table');
@@ -96,6 +77,7 @@
   var layers = {
     parts: $('layerParts'),
     glow: $('layerGlow'),
+    fx: $('layerFx'),
     terms: $('layerTerms'),
     wires: $('layerWires'),
     clips: $('layerClips')
@@ -107,6 +89,8 @@
   var toastAction = $('toastAction');
   var emptyHint = $('emptyHint');
   var toolList = $('toolList');
+  var lessonTabs = $('lessonTabs');
+  var lessonTitle = $('lessonTitle');
   var missionList = $('missionList');
   var progressEl = $('progress');
 
@@ -120,6 +104,26 @@
   }
   function dist(a, b) { return Math.hypot(a.x - b.x, a.y - b.y); }
   function fmt(n) { return Math.round(n * 10) / 10; }
+  function lesson() { return lessonById[state.lessonId]; }
+  // 받침이 있으면 ‘을’, 없으면 ‘를’ (전자석을, 전구를)
+  function objectParticle(word) {
+    var code = word.charCodeAt(word.length - 1) - 0xac00;
+    return word + (code >= 0 && code < 11172 && code % 28 ? '을' : '를');
+  }
+
+  function nextId(prefix) { state.seq += 1; return prefix + state.seq; }
+  function findPart(id) {
+    for (var i = 0; i < state.parts.length; i++) if (state.parts[i].id === id) return state.parts[i];
+    return null;
+  }
+  function findWire(id) {
+    for (var i = 0; i < state.wires.length; i++) if (state.wires[i].id === id) return state.wires[i];
+    return null;
+  }
+  function partsOf(type) { return state.parts.filter(function (p) { return p.type === type; }); }
+  function onTableCount(type) {
+    return type === 'wire' ? state.wires.length : partsOf(type).length;
+  }
 
   // 돌린 부품이 차지하는 가로·세로 반폭
   function extents(p) {
@@ -132,30 +136,42 @@
     });
     return { x: ex, y: ey };
   }
-  function keepOnTable(p) {
-    var e = extents(p);
-    var mx = Math.min(e.x + CLIP_ROOM, view.W / 2), my = Math.min(e.y + CLIP_ROOM, view.H / 2);
-    p.x = clamp(p.x, mx, view.W - mx);
-    p.y = clamp(p.y, my, view.H - my);
+
+  // 붙어 있는 전지 끼우개는 한 덩어리로 움직인다
+  function chainOf(p) {
+    if (!p || p.type !== 'holder') return p ? [p] : [];
+    var head = p, guard = 0;
+    while (head.joinPrev && findPart(head.joinPrev) && guard++ < 20) head = findPart(head.joinPrev);
+    var list = [], cur = head;
+    guard = 0;
+    while (cur && guard++ < 20) {
+      list.push(cur);
+      cur = cur.joinNext ? findPart(cur.joinNext) : null;
+    }
+    return list;
   }
 
-  function nextId(prefix) { state.seq += 1; return prefix + state.seq; }
-  function findPart(id) {
-    for (var i = 0; i < state.parts.length; i++) if (state.parts[i].id === id) return state.parts[i];
-    return null;
+  // 덩어리 전체가 테이블 안에 머물도록 이동량을 줄여서 옮긴다
+  function moveGroup(group, dx, dy) {
+    var lo = { x: -Infinity, y: -Infinity }, hi = { x: Infinity, y: Infinity };
+    group.forEach(function (m) {
+      var e = extents(m);
+      var mx = Math.min(e.x + CLIP_ROOM, view.W / 2), my = Math.min(e.y + CLIP_ROOM, view.H / 2);
+      lo.x = Math.max(lo.x, mx - m.x); hi.x = Math.min(hi.x, view.W - mx - m.x);
+      lo.y = Math.max(lo.y, my - m.y); hi.y = Math.min(hi.y, view.H - my - m.y);
+    });
+    if (lo.x <= hi.x) dx = clamp(dx, lo.x, hi.x);
+    if (lo.y <= hi.y) dy = clamp(dy, lo.y, hi.y);
+    group.forEach(function (m) { m.x += dx; m.y += dy; });
   }
-  function findWire(id) {
-    for (var i = 0; i < state.wires.length; i++) if (state.wires[i].id === id) return state.wires[i];
-    return null;
-  }
-  function onTableCount(type) {
-    if (type === 'wire') return state.wires.length;
-    return state.parts.filter(function (p) { return p.type === type; }).length;
-  }
+  function keepOnTable(p) { moveGroup(chainOf(p), 0, 0); }
 
   // 끼우개에 끼운 전지·전구는 끼우개가 대신 그리고, 따로 단자를 내놓지 않는다
   function isTucked(p) {
     return (p.type === 'battery' && p.holderId) || (p.type === 'bulb' && p.socketId);
+  }
+  function termHidden(p, term) {
+    return p.type === 'holder' && ((term === 'a' && p.joinPrev) || (term === 'b' && p.joinNext));
   }
   function termPos(p, term) {
     var t = TYPES[p.type].terms[term];
@@ -167,7 +183,7 @@
     state.parts.forEach(function (p) {
       if (isTucked(p)) return;
       Object.keys(TYPES[p.type].terms).forEach(function (term) {
-        list.push({ part: p, term: term, pos: termPos(p, term) });
+        if (!termHidden(p, term)) list.push({ part: p, term: term, pos: termPos(p, term) });
       });
     });
     return list;
@@ -191,6 +207,16 @@
     return { x: e.x, y: e.y };
   }
 
+  function wiredTerms(partId) {
+    var seen = {};
+    state.wires.forEach(function (w) {
+      w.ends.forEach(function (e) {
+        if (e.attach && e.attach.partId === partId) seen[e.attach.term] = true;
+      });
+    });
+    return seen;
+  }
+
   // 집게 끝이 향하는 방향(도). 단자에 물린 집게는 단자 바깥쪽에서 다가오고, 한 단자에 여럿이면 부채꼴로 벌린다.
   function clipAngles() {
     var angles = {};
@@ -203,10 +229,10 @@
       });
     });
     Object.keys(groups).forEach(function (k) {
-      var parts = k.split(':');
-      var p = findPart(parts[0]);
+      var bits = k.split(':');
+      var p = findPart(bits[0]);
       if (!p) return;
-      var base = TYPES[p.type].terms[parts[1]].out + p.rot + 180;
+      var base = TYPES[p.type].terms[bits[1]].out + p.rot + 180;
       var list = groups[k];
       list.forEach(function (key, idx) {
         angles[key] = base + (idx - (list.length - 1) / 2) * 30;
@@ -244,22 +270,138 @@
     };
   }
 
-  /* ---------- 회로 판단 ---------- */
+  /* ---------- 회로 결과 읽기 ---------- */
 
-  function litBulbs(r) {
-    return state.parts.filter(function (p) { return p.type === 'bulb' && r.bulbs[p.id] && r.bulbs[p.id].lit; });
-  }
-
-  // 불이 켜진 전구가 꼭 2개일 때 두 전구가 직렬인지 병렬인지
-  function pairShape(r) {
-    var lit = litBulbs(r);
-    if (lit.length !== 2 || r.shorted) return null;
-    var a = r.bulbNets[lit[0].id], b = r.bulbNets[lit[1].id];
-    var shared = a.filter(function (n) { return b.indexOf(n) >= 0; }).length;
-    if (shared === 2) return 'parallel';
-    if (shared === 1 && Math.abs(r.bulbs[lit[0].id].current - r.bulbs[lit[1].id].current) < 0.01) return 'series';
+  // 부품에 걸린 전압으로 전지 몇 개에 해당하는지 판단한다 (전지 1개 ≈ 1.4 V, 2개 ≈ 2.8 V)
+  function cellLevel(v) {
+    v = Math.abs(v);
+    if (v >= 2.4 && v < 3.4) return 'two';
+    if (v >= 1.0 && v < 2.0) return 'one';
     return null;
   }
+
+  function litBulbs(r) {
+    return partsOf('bulb').filter(function (p) { return r.bulbs[p.id] && r.bulbs[p.id].lit; });
+  }
+  function motorSpeed(id) {
+    var m = result.motors[id];
+    return m ? m.voltage / 1.5 * 1.1 : 0;  // 초당 회전수. 전지 1개일 때 약 1바퀴
+  }
+  function buzzerLoudness(id) {
+    var b = result.buzzers[id];
+    return b && b.on ? clamp(b.voltage / 3, 0.2, 1.3) : 0;
+  }
+
+  // 전자석, 둥근 철 고리, 나침반
+  function computeFx() {
+    var out = { attached: [], ringsLeft: {}, needles: {}, strong: {}, magnets: [] };
+    var piles = partsOf('rings');
+    piles.forEach(function (r) { out.ringsLeft[r.id] = P.RING_TOTAL; });
+    var poles = [];
+
+    partsOf('magnet').forEach(function (m) {
+      var I = result.magnets[m.id] ? result.magnets[m.id].current : 0;
+      var on = Math.abs(I) > 0.05;
+      var ends = P.MAGNET_ENDS.map(function (e) {
+        var q = rotate(e.x, e.y, m.rot);
+        return { x: m.x + q.x, y: m.y + q.y };
+      });
+      var dirs = [rotate(-1, 0, m.rot), rotate(1, 0, m.rot)];
+      var info = { part: m, current: I, on: on, nearRings: false, level: on ? cellLevel(I * C.constants.R_MAGNET) : null };
+      ends.forEach(function (e, k) {
+        var pile = null, best = RING_REACH;
+        piles.forEach(function (r) {
+          var d = dist(e, r);
+          if (d < best) { pile = r; best = d; }
+        });
+        if (!pile) return;
+        info.nearRings = true;
+        if (!on) return;
+        var n = Math.min(Math.min(8, Math.round(Math.abs(I) * 4.4)), out.ringsLeft[pile.id]);
+        out.ringsLeft[pile.id] -= n;
+        out.attached.push({ pos: e, dir: dirs[k], count: n });
+      });
+      if (on) {
+        // 전류가 a → b로 흐르면 [1] 쪽 끝이 N극
+        poles.push({ pos: ends[1], q: I });
+        poles.push({ pos: ends[0], q: -I });
+      }
+      info.ends = ends;
+      out.magnets.push(info);
+    });
+
+    partsOf('compass').forEach(function (c) {
+      var bx = 0, by = 0;
+      poles.forEach(function (pl) {
+        var dx = c.x - pl.pos.x, dy = c.y - pl.pos.y;
+        var r2 = Math.max(dx * dx + dy * dy, 400);
+        var k = pl.q / (r2 * Math.sqrt(r2));
+        bx += k * dx; by += k * dy;
+      });
+      out.needles[c.id] = Math.atan2(by - EARTH, bx) * 180 / Math.PI;
+      out.strong[c.id] = Math.hypot(bx, by) > 2 * EARTH;
+    });
+    return out;
+  }
+
+  // lessons.js의 활동이 쓰는 도우미
+  var ctx = {
+    litWithSwitch: function () {
+      return litBulbs(result).length > 0 && partsOf('switch').some(function (s) {
+        return s.closed && result.switches[s.id].current > 0.02;
+      });
+    },
+    testedRods: function () {
+      var litCount = function (r) { return litBulbs(r).length; };
+      return state.parts.filter(function (p) {
+        if (!/^rod/.test(p.type)) return false;
+        var w = wiredTerms(p.id);
+        if (!w.a || !w.b) return false;
+        var as = function (type) {
+          return C.solve(state.parts.map(function (q) { return q === p ? Object.assign({}, q, { type: type }) : q; }), state.wires);
+        };
+        // 막대가 전기를 통할 때와 통하지 않을 때 불이 켜진 전구 수가 다르면 막대를 시험해 본 것이다
+        return litCount(as('rodMetal')) > litCount(as('rodPlastic'));
+      }).map(function (p) { return p.type; });
+    },
+    levels: function (kind) {
+      var seen = [];
+      partsOf(kind).forEach(function (p) {
+        var v = 0;
+        if (kind === 'bulb' && result.bulbs[p.id].lit) v = result.bulbs[p.id].voltage;
+        if (kind === 'motor' && Math.abs(result.motors[p.id].voltage) > 0.3) v = result.motors[p.id].voltage;
+        if (kind === 'buzzer' && result.buzzers[p.id].on) v = result.buzzers[p.id].voltage;
+        var lv = cellLevel(v);
+        if (lv && seen.indexOf(lv) < 0) seen.push(lv);
+      });
+      return seen;
+    },
+    magnetRings: function () {
+      var seen = [];
+      fx.magnets.forEach(function (m) {
+        if (!m.nearRings) return;
+        var w = wiredTerms(m.part.id);
+        if (!m.on && w.a && w.b) seen.push('off');
+        if (m.on && m.level) seen.push(m.level);
+      });
+      return seen;
+    },
+    compassSides: function (memo) {
+      var seen = [];
+      fx.magnets.forEach(function (m) {
+        if (!m.on) return;
+        var near = partsOf('compass').some(function (c) {
+          return fx.strong[c.id] && m.ends.some(function (e) { return dist(e, c) < COMPASS_REACH; });
+        });
+        if (!near) return;
+        var sign = m.current > 0 ? 1 : -1;
+        if (!memo.first) memo.first = sign;
+        var id = sign === memo.first ? 'fwd' : 'rev';
+        if (seen.indexOf(id) < 0) seen.push(id);
+      });
+      return seen;
+    }
+  };
 
   /* ---------- 부품 다루기 ---------- */
 
@@ -284,28 +426,28 @@
     if (onTableCount(type) >= TYPES[type].max) return;
     if (type === 'wire') {
       var spot = findSpot(110);
-      var w = {
+      state.wires.push({
         id: nextId('wire'),
         color: WIRE_COLORS[state.wireColor % WIRE_COLORS.length],
         ends: [
           { x: spot.x - 70, y: spot.y, attach: null },
           { x: spot.x + 70, y: spot.y, attach: null }
         ]
-      };
+      });
       state.wireColor += 1;
-      state.wires.push(w);
       state.selected = null;
     } else {
       var s = findSpot(TYPES[type].radius);
       var p = { id: nextId(type), type: type, x: s.x, y: s.y, rot: 0 };
       if (type === 'battery') { p.holderId = null; p.flipped = false; }
-      if (type === 'holder') p.batteryId = null;
+      if (type === 'holder') { p.batteryId = null; p.joinPrev = null; p.joinNext = null; }
       if (type === 'bulb') p.socketId = null;
       if (type === 'socket') p.bulbId = null;
       if (type === 'switch') p.closed = false;
-      keepOnTable(p);
       state.parts.push(p);
+      keepOnTable(p);
       state.selected = { kind: 'part', id: p.id };
+      state.actionsOpen = false;
     }
     if (!hintsShown[type]) {
       hintsShown[type] = true;
@@ -314,17 +456,16 @@
     update();
   }
 
-  function bringToTop(p) {
-    state.parts = state.parts.filter(function (q) { return q !== p; });
-    state.parts.push(p);
+  function bringToTop(group) {
+    state.parts = state.parts.filter(function (q) { return group.indexOf(q) < 0; }).concat(group);
   }
 
-  // 부품에서 집게를 떼어 낸다. 떨어진 집게는 단자 바로 바깥에 놓인다.
-  function detachAt(partId) {
-    var p = findPart(partId);
+  // 집게를 떼어 낸다. 떨어진 집게는 단자 바로 바깥에 놓인다.
+  function detachWhere(test) {
     state.wires.forEach(function (w) {
       w.ends.forEach(function (e) {
-        if (!e.attach || e.attach.partId !== partId) return;
+        if (!e.attach || !test(e.attach)) return;
+        var p = findPart(e.attach.partId);
         var pos = p ? termPos(p, e.attach.term) : { x: e.x, y: e.y };
         var out = p ? (TYPES[p.type].terms[e.attach.term].out + p.rot) * Math.PI / 180 : 0;
         e.x = clamp(pos.x + Math.cos(out) * 22, 10, view.W - 10);
@@ -333,6 +474,8 @@
       });
     });
   }
+  function detachAt(partId) { detachWhere(function (a) { return a.partId === partId; }); }
+  function detachTerm(partId, term) { detachWhere(function (a) { return a.partId === partId && a.term === term; }); }
 
   function canInsert(item, box) {
     if (!item || !box || item === box) return false;
@@ -368,10 +511,10 @@
       box.bulbId = item.id;
     }
     item.x = box.x; item.y = box.y; item.rot = box.rot;
-    bringToTop(box);
+    bringToTop(chainOf(box));
     toast(item.type === 'battery'
       ? (item.flipped ? '전지를 거꾸로 끼웠어요. (+)극 방향을 확인해 보세요.' : '전지를 전지 끼우개에 끼웠어요.')
-      : '꼬마전구를 전구 끼우개에 끼웠어요.');
+      : '전구를 전구 끼우개에 끼웠어요.');
   }
 
   function eject(box) {
@@ -395,11 +538,78 @@
     item.x = box.x + off.x;
     item.y = box.y + off.y;
     keepOnTable(item);
-    bringToTop(item);
+    bringToTop([item]);
     state.selected = { kind: 'part', id: item.id };
   }
 
+  // 끌고 있는 전지 끼우개 덩어리의 끝이 다른 끼우개의 반대쪽 끝에 닿았는지
+  function joinTarget(group) {
+    var head = group[0], tail = group[group.length - 1];
+    if (!head || head.type !== 'holder') return null;
+    var best = null;
+    state.parts.forEach(function (o) {
+      if (o.type !== 'holder' || group.indexOf(o) >= 0 || o.rot !== head.rot) return;
+      if (!o.joinNext) {
+        var d = dist(termPos(head, 'a'), termPos(o, 'b'));
+        if (d < JOIN_SNAP && (!best || d < best.d)) best = { d: d, other: o, after: true };
+      }
+      if (!o.joinPrev) {
+        var d2 = dist(termPos(tail, 'b'), termPos(o, 'a'));
+        if (d2 < JOIN_SNAP && (!best || d2 < best.d)) best = { d: d2, other: o, after: false };
+      }
+    });
+    return best;
+  }
+
+  function join(group, t) {
+    var u = rotate(P.JOIN_GAP, 0, t.other.rot);
+    var head = group[0], tail = group[group.length - 1];
+    var dx, dy;
+    if (t.after) {
+      // 다른 끼우개의 (+)쪽 끝에 이 덩어리의 (−)쪽 끝을 붙인다
+      dx = t.other.x + u.x - head.x; dy = t.other.y + u.y - head.y;
+      group.forEach(function (m) { m.x += dx; m.y += dy; });
+      detachTerm(t.other.id, 'b'); detachTerm(head.id, 'a');
+      t.other.joinNext = head.id; head.joinPrev = t.other.id;
+    } else {
+      dx = t.other.x - u.x - tail.x; dy = t.other.y - u.y - tail.y;
+      group.forEach(function (m) { m.x += dx; m.y += dy; });
+      detachTerm(tail.id, 'b'); detachTerm(t.other.id, 'a');
+      tail.joinNext = t.other.id; t.other.joinPrev = tail.id;
+    }
+    var all = chainOf(head);
+    moveGroup(all, 0, 0);
+    bringToTop(all);
+    toast('전지 끼우개를 이어 붙였어요.');
+  }
+
+  function unjoin(p) {
+    var prev = p.joinPrev ? findPart(p.joinPrev) : null;
+    var next = p.joinNext ? findPart(p.joinNext) : null;
+    if (prev) prev.joinNext = null;
+    if (next) next.joinPrev = null;
+    p.joinPrev = null; p.joinNext = null;
+    var off = rotate(0, 74, p.rot);
+    p.x += off.x; p.y += off.y;
+    keepOnTable(p);
+  }
+
+  function rotateGroup(group, center) {
+    group.forEach(function (m) {
+      var q = rotate(m.x - center.x, m.y - center.y, 90);
+      m.x = center.x + q.x; m.y = center.y + q.y;
+      m.rot = norm(m.rot + 90);
+    });
+    moveGroup(group, 0, 0);
+  }
+
   function removePart(p) {
+    if (p.type === 'holder') {
+      var prev = p.joinPrev ? findPart(p.joinPrev) : null;
+      var next = p.joinNext ? findPart(p.joinNext) : null;
+      if (prev) prev.joinNext = null;
+      if (next) next.joinPrev = null;
+    }
     var ids = [p.id];
     if (p.type === 'holder' && p.batteryId) ids.push(p.batteryId);
     if (p.type === 'socket' && p.bulbId) ids.push(p.bulbId);
@@ -478,6 +688,7 @@
       }
       if (p.type === 'switch') p.closed = !p.closed;
       state.selected = { kind: 'part', id: p.id };
+      state.actionsOpen = true;
       return;
     }
     if (d.kind === 'term') {
@@ -500,6 +711,7 @@
     }
     if (d.kind === 'wire') {
       state.selected = { kind: 'wire', id: d.wireId };
+      state.actionsOpen = true;
     }
   }
 
@@ -558,11 +770,9 @@
       beginDrag();
     }
     var pt = toTable(e);
-    if (drag.kind === 'part' || drag.kind === 'term') {
+    if (drag.kind === 'part') {
       var p = findPart(drag.partId);
-      p.x = pt.x + drag.dx;
-      p.y = pt.y + drag.dy;
-      keepOnTable(p);
+      moveGroup(drag.group, pt.x + drag.dx - p.x, pt.y + drag.dy - p.y);
     } else if (drag.kind === 'clip') {
       var end = findWire(drag.wireId).ends[drag.end];
       end.x = clamp(pt.x + drag.dx, 10, view.W - 10);
@@ -582,10 +792,12 @@
 
   function beginDrag() {
     svg.classList.add('dragging');
+    state.actionsOpen = false;
     if (drag.kind === 'part' || drag.kind === 'term') {
       drag.kind = 'part';
       var p = findPart(drag.partId);
-      bringToTop(p);
+      drag.group = chainOf(p);
+      bringToTop(drag.group);
       state.selected = { kind: 'part', id: p.id };
     } else if (drag.kind === 'clip') {
       var w = findWire(drag.wireId);
@@ -612,9 +824,12 @@
       if (d.kind === 'part') {
         var p = findPart(d.partId);
         var box = p && insertTarget(p);
+        var jt = p && p.type === 'holder' ? joinTarget(d.group) : null;
         if (box) {
           insert(p, box);
           state.selected = { kind: 'part', id: box.id };
+        } else if (jt) {
+          join(d.group, jt);
         }
       } else if (d.kind === 'clip') {
         var w = findWire(d.wireId);
@@ -658,9 +873,7 @@
       var moves = { ArrowLeft: [-step, 0], ArrowRight: [step, 0], ArrowUp: [0, -step], ArrowDown: [0, step] };
       if (moves[e.key]) {
         e.preventDefault();
-        part.x += moves[e.key][0];
-        part.y += moves[e.key][1];
-        keepOnTable(part);
+        moveGroup(chainOf(part), moves[e.key][0], moves[e.key][1]);
         update();
         return;
       }
@@ -680,12 +893,13 @@
       var p = findPart(sel.id);
       if (!p) return [];
       var list = [];
-      if (p.type === 'switch') list.push(['toggle', p.closed ? '스위치 끄기' : '스위치 켜기']);
-      list.push(['rotate', '돌리기']);
+      if (p.type === 'switch') list.push(['toggle', p.closed ? '스위치 열기' : '스위치 닫기']);
+      if (p.type !== 'rings' && p.type !== 'compass') list.push(['rotate', '돌리기']);
       if (p.type === 'holder' && p.batteryId) {
         list.push(['flip', '전지 방향 바꾸기']);
         list.push(['eject', '전지 빼기']);
       }
+      if (p.type === 'holder' && (p.joinPrev || p.joinNext)) list.push(['unjoin', '끼우개 떼기']);
       if (p.type === 'socket' && p.bulbId) list.push(['eject', '전구 빼기']);
       list.push(['remove', '치우기']);
       return list;
@@ -707,7 +921,7 @@
     if (sel.kind === 'part') {
       var p = findPart(sel.id);
       if (!p) return;
-      if (act === 'rotate') { p.rot = norm(p.rot + 90); keepOnTable(p); }
+      if (act === 'rotate' && p.type !== 'rings' && p.type !== 'compass') rotateGroup(chainOf(p), { x: p.x, y: p.y });
       if (act === 'toggle' && p.type === 'switch') p.closed = !p.closed;
       if (act === 'flip' && p.batteryId) {
         var bat = findPart(p.batteryId);
@@ -715,6 +929,7 @@
         toast(bat.flipped ? '전지를 거꾸로 끼웠어요.' : '전지를 바르게 끼웠어요.');
       }
       if (act === 'eject') eject(p);
+      if (act === 'unjoin') unjoin(p);
       if (act === 'remove') { removePart(p); state.selected = null; }
     } else if (sel.kind === 'wire') {
       var w = findWire(sel.id);
@@ -745,13 +960,16 @@
 
   function partLabel(p) {
     var name = TYPES[p.type].name;
-    if (p.type === 'holder') return name + (p.batteryId ? ', 전지 끼움' : ', 비어 있음');
+    if (p.type === 'holder') return name + (p.batteryId ? ', 전지 끼움' : ', 비어 있음') + (p.joinPrev || p.joinNext ? ', 다른 끼우개와 붙어 있음' : '');
     if (p.type === 'socket') {
       if (!p.bulbId) return name + ', 비어 있음';
-      return name + ', 꼬마전구 끼움, ' + (result.bulbs[p.bulbId].lit ? '불 켜짐' : '불 꺼짐');
+      return name + ', 전구 끼움, ' + (result.bulbs[p.bulbId].lit ? '불 켜짐' : '불 꺼짐');
     }
     if (p.type === 'bulb') return name + ', ' + (result.bulbs[p.id].lit ? '불 켜짐' : '불 꺼짐');
-    if (p.type === 'switch') return name + ', ' + (p.closed ? '켜짐' : '꺼짐');
+    if (p.type === 'switch') return name + ', ' + (p.closed ? '닫힘' : '열림');
+    if (p.type === 'motor') return name + ', ' + (Math.abs(motorSpeed(p.id)) > 0.05 ? '도는 중' : '멈춤');
+    if (p.type === 'buzzer') return name + ', ' + (result.buzzers[p.id].on ? '울리는 중' : '조용함');
+    if (p.type === 'magnet') return name + ', ' + (Math.abs(result.magnets[p.id].current) > 0.05 ? '전기가 흐름' : '전기가 흐르지 않음');
     return name;
   }
 
@@ -764,7 +982,9 @@
     var sel = state.selected;
     var dragged = drag && drag.moved && drag.kind === 'part' ? findPart(drag.partId) : null;
     var dropBox = dragged ? insertTarget(dragged) : null;
+    var joinBox = dragged && dragged.type === 'holder' ? joinTarget(drag.group) : null;
     var selPart = sel && sel.kind === 'part' ? findPart(sel.id) : null;
+    var selGroup = selPart ? chainOf(selPart) : [];
 
     layers.parts.innerHTML = state.parts.map(function (p) {
       if (isTucked(p)) return '';
@@ -777,10 +997,19 @@
       if (p.type === 'bulb') opts.brightness = brightnessOf(p.id);
       if (p.type === 'socket' && p.bulbId) opts.bulb = { brightness: brightnessOf(p.bulbId) };
       if (p.type === 'switch') opts.closed = p.closed;
+      if (p.type === 'motor') {
+        opts.id = p.id;
+        opts.angle = rotorAngle[p.id] || 0;
+        opts.fast = Math.abs(motorSpeed(p.id)) > 1.6;
+      }
+      if (p.type === 'buzzer') opts.loudness = buzzerLoudness(p.id);
+      if (p.type === 'rings') opts.count = fx.ringsLeft[p.id];
+      if (p.type === 'compass') opts.needle = (fx.needles[p.id] === undefined ? -90 : fx.needles[p.id]) - p.rot;
 
       var cls = 'part';
       if (selPart === p) cls += ' is-selected';
-      if (p === dropBox || (selPart && canInsert(selPart, p))) cls += ' is-target';
+      else if (selGroup.indexOf(p) >= 0) cls += ' is-grouped';
+      if (p === dropBox || (joinBox && p === joinBox.other) || (selPart && canInsert(selPart, p))) cls += ' is-target';
       var box = TYPES[p.type].box;
       return '<g class="' + cls + '" data-kind="part" data-part="' + p.id + '" data-key="part:' + p.id + '"' +
         ' tabindex="0" role="button" aria-label="' + partLabel(p) + '"' +
@@ -792,8 +1021,7 @@
 
   function renderGlow() {
     var out = '';
-    state.parts.forEach(function (p) {
-      if (p.type !== 'bulb') return;
+    partsOf('bulb').forEach(function (p) {
       var b = brightnessOf(p.id);
       if (!b) return;
       var host = p.socketId ? findPart(p.socketId) : p;
@@ -802,11 +1030,25 @@
         : P.GLOBE;
       var q = rotate(local.x, local.y, host.rot);
       var s = Math.sqrt(Math.min(b, 4));
-      // 직렬(약 0.25배)과 병렬(약 1배)의 밝기 차이가 눈에 띄도록 크기와 진하기를 함께 바꾼다
+      // 전지 1개와 2개의 밝기 차이가 눈에 띄도록 크기와 진하기를 함께 바꾼다
       out += '<circle cx="' + fmt(host.x + q.x) + '" cy="' + fmt(host.y + q.y) + '" r="' + fmt(18 + 40 * s) +
         '" fill="url(#gGlow)" opacity="' + Math.min(1, 0.05 + 0.85 * s).toFixed(2) + '"/>';
     });
     layers.glow.innerHTML = out;
+  }
+
+  // 전자석 끝에 붙은 둥근 철 고리
+  function renderFx() {
+    var out = '';
+    fx.attached.forEach(function (a) {
+      var perp = { x: -a.dir.y, y: a.dir.x };
+      for (var j = 0; j < a.count; j++) {
+        var along = 4 + j * 7;
+        var side = (j % 2 ? 1 : -1) * (3 + (j % 3));
+        out += P.ring(fmt(a.pos.x + a.dir.x * along + perp.x * side), fmt(a.pos.y + a.dir.y * along + perp.y * side + j * 1.5));
+      }
+    });
+    layers.fx.innerHTML = out;
   }
 
   function renderTerms() {
@@ -863,6 +1105,15 @@
     layers.clips.innerHTML = clipsOut;
   }
 
+  function buildTools() {
+    toolList.innerHTML = lesson().tools.map(function (type) {
+      return '<li><button type="button" class="tool" data-type="' + type + '">' +
+        '<span class="tool-art">' + P.icon(type) + '</span>' +
+        '<span class="tool-text"><span class="tool-name">' + TYPES[type].name + '</span><span class="tool-count"></span></span>' +
+        '</button></li>';
+    }).join('');
+  }
+
   function renderTools() {
     toolList.querySelectorAll('.tool').forEach(function (btn) {
       var type = btn.getAttribute('data-type');
@@ -875,22 +1126,34 @@
 
   function renderStatus() {
     var tone = 'idle', text;
-    var bulbs = state.parts.filter(function (p) { return p.type === 'bulb'; });
+    var bulbs = partsOf('bulb');
     var lit = litBulbs(result);
+    var spinning = partsOf('motor').filter(function (p) { return Math.abs(motorSpeed(p.id)) > 0.05; });
+    var ringing = partsOf('buzzer').filter(function (p) { return result.buzzers[p.id].on; });
+    var reversedBuzzer = partsOf('buzzer').some(function (p) { return result.buzzers[p.id].voltage < -0.5; });
+    var magnets = partsOf('magnet').filter(function (p) { return Math.abs(result.magnets[p.id].current) > 0.05; });
+    var loads = state.parts.filter(function (p) { return LOADS.indexOf(p.type) >= 0; });
+    var pieces = [];
+    if (lit.length) pieces.push(lit.length === bulbs.length ? '전구 ' + lit.length + '개에 불이 켜졌어요' : '전구 ' + bulbs.length + '개 중 ' + lit.length + '개에 불이 켜졌어요');
+    if (spinning.length) pieces.push('전동기가 돌아요');
+    if (ringing.length) pieces.push('버저가 울려요');
+    if (magnets.length) pieces.push('전자석에 전기가 흘러요');
+
     if (!state.parts.length && !state.wires.length) {
       text = '테이블이 비어 있어요.';
     } else if (result.shorted) {
       tone = 'danger';
-      text = '합선! 전구를 거치지 않고 전지의 두 극이 바로 이어졌어요. 실제로는 전지와 전선이 뜨거워져 위험해요.';
-    } else if (lit.length) {
+      text = '합선! 전지의 (+)극과 (−)극이 전선으로만 바로 이어졌어요. 실제로는 전지와 전선이 뜨거워져 위험해요.';
+    } else if (pieces.length) {
       tone = 'lit';
-      text = lit.length === bulbs.length
-        ? '꼬마전구 ' + lit.length + '개에 불이 켜졌어요.'
-        : '꼬마전구 ' + bulbs.length + '개 중 ' + lit.length + '개에 불이 켜졌어요.';
-    } else if (!bulbs.length) {
-      text = '꼬마전구를 테이블에 올려 보세요.';
+      text = pieces.join(' · ') + '.';
+    } else if (reversedBuzzer) {
+      text = '버저가 울리지 않아요. 버저의 빨간색·검은색 전선이 어느 극 쪽에 이어졌는지 확인해 보세요.';
+    } else if (!loads.length) {
+      var names = lesson().tools.filter(function (t) { return LOADS.indexOf(t) >= 0; }).map(function (t) { return TYPES[t].name; });
+      text = names.length > 1 ? names.join(', ') + ' 중 하나를 테이블에 올려 보세요.' : objectParticle(names[0]) + ' 테이블에 올려 보세요.';
     } else {
-      text = '아직 불이 켜지지 않았어요. 전기가 흐르는 길이 끊긴 곳은 없는지 살펴보세요.';
+      text = '아직 전기가 흐르지 않아요. 전지의 (+)극부터 (−)극까지 끊어진 곳은 없는지 살펴보세요.';
     }
     if (statusEl.textContent !== text) statusEl.textContent = text;
     statusEl.setAttribute('data-tone', tone);
@@ -898,7 +1161,7 @@
   }
 
   function renderActionbar() {
-    var acts = drag && drag.moved ? [] : actionsFor(state.selected);
+    var acts = !state.actionsOpen || (drag && drag.moved) ? [] : actionsFor(state.selected);
     if (!acts.length) {
       actionbar.hidden = true;
       actionbar.removeAttribute('data-sig');
@@ -948,35 +1211,120 @@
     actionbar.style.top = y + 'px';
   }
 
+  function renderLessonTabs() {
+    lessonTabs.innerHTML = LESSONS.map(function (l) {
+      var on = l.id === state.lessonId;
+      return '<button type="button" role="tab" class="lesson-tab" id="tab-' + l.id + '" data-lesson="' + l.id + '"' +
+        ' aria-selected="' + on + '" tabindex="' + (on ? 0 : -1) + '">' + l.tab + '</button>';
+    }).join('');
+  }
+
+  function missionDone(m) {
+    return m.steps.every(function (s) { return state.steps[m.id + ':' + s.id]; });
+  }
+
   function renderMissions() {
+    var l = lesson();
+    lessonTitle.textContent = l.pages ? l.title + ' (교과서 ' + l.pages + ')' : l.title;
+    if (!l.missions.length) {
+      missionList.innerHTML = '<li class="mission-note">' + l.note + '</li>';
+      progressEl.textContent = '';
+      $('resetMissions').hidden = true;
+      return;
+    }
+    $('resetMissions').hidden = false;
     var count = 0;
-    missionList.innerHTML = MISSIONS.map(function (m, i) {
-      var done = !!state.done[m.id];
+    missionList.innerHTML = l.missions.map(function (m, i) {
+      var done = missionDone(m);
       if (done) count += 1;
+      var steps = m.steps.length > 1 || !done ? '<ul class="steps" aria-label="관찰한 것">' + m.steps.map(function (s) {
+        var seen = state.steps[m.id + ':' + s.id];
+        return '<li class="step' + (seen ? ' is-seen' : '') + '">' + s.label + '<span class="visually-hidden">' + (seen ? ', 관찰함' : ', 아직') + '</span></li>';
+      }).join('') + '</ul>' : '';
       return '<li class="mission' + (done ? ' is-done' : '') + (justDone === m.id ? ' just-done' : '') + '">' +
         '<span class="mission-num" aria-hidden="true">' + (done ? '✓' : i + 1) + '</span>' +
+        '<div class="mission-body">' +
         '<h3>' + m.title + '</h3>' +
         '<p>' + m.body + '</p>' +
+        (m.tip ? '<p class="tip"><b>도우미</b> ' + m.tip + '</p>' : '') +
+        steps +
         '<p class="think"><b>생각해 보기</b> ' + m.think + '</p>' +
         '<span class="mission-state">' + (done ? '성공' : '도전 중') + '</span>' +
-        '</li>';
+        '</div></li>';
     }).join('');
-    progressEl.textContent = count + ' / ' + MISSIONS.length;
+    progressEl.textContent = count + ' / ' + l.missions.length;
     justDone = null;
   }
 
   function checkMissions() {
     var changed = false;
-    MISSIONS.forEach(function (m, i) {
-      if (state.done[m.id]) return;
-      if (m.check(result)) {
-        state.done[m.id] = true;
-        changed = true;
+    lesson().missions.forEach(function (m, i) {
+      if (missionDone(m)) return;
+      var memo = state.memo[m.id] = state.memo[m.id] || {};
+      var seen = m.observe(ctx, memo) || [];
+      var fresh = seen.filter(function (id) { return !state.steps[m.id + ':' + id]; });
+      if (!fresh.length) return;
+      fresh.forEach(function (id) { state.steps[m.id + ':' + id] = true; });
+      changed = true;
+      if (missionDone(m)) {
         justDone = m.id;
-        toast('활동 ' + (i + 1) + ' 성공: ' + m.title, { tone: 'ok', duration: 3200 });
+        toast('성공! ' + m.title.replace(/^실험 \d+ /, ''), { tone: 'ok', duration: 3200 });
+      } else {
+        var labels = m.steps.filter(function (s) { return fresh.indexOf(s.id) >= 0; }).map(function (s) { return s.label; });
+        toast('관찰했어요: ' + labels.join(', '), { tone: 'ok' });
       }
     });
     return changed;
+  }
+
+  /* ---------- 소리와 움직임 ---------- */
+
+  // 버저 소리. 소리는 누르기나 끌기처럼 사용자가 무언가를 한 뒤에만 시작한다.
+  function setBuzz(loud) {
+    if (!state.sound) loud = 0;
+    if (loud > 0 && !audio) {
+      var AC = window.AudioContext || window.webkitAudioContext;
+      if (!AC) return;
+      try {
+        var ac = new AC();
+        var osc = ac.createOscillator();
+        var gain = ac.createGain();
+        osc.type = 'square';
+        osc.frequency.value = 2100;
+        gain.gain.value = 0;
+        osc.connect(gain);
+        gain.connect(ac.destination);
+        osc.start();
+        audio = { ctx: ac, gain: gain };
+      } catch (err) {
+        return;
+      }
+    }
+    if (!audio) return;
+    if (loud > 0 && audio.ctx.state === 'suspended' && audio.ctx.resume) {
+      audio.ctx.resume().catch(function () { /* 다음 누르기 때 다시 시도한다 */ });
+    }
+    audio.gain.gain.setTargetAtTime(loud > 0 ? 0.06 * loud * loud : 0, audio.ctx.currentTime, 0.015);
+  }
+
+  function animate(t) {
+    var dt = animLast === null ? 0 : Math.min(0.1, (t - animLast) / 1000);
+    animLast = t;
+    var any = false;
+    partsOf('motor').forEach(function (p) {
+      var sp = motorSpeed(p.id);
+      if (Math.abs(sp) < 0.05) return;
+      any = true;
+      rotorAngle[p.id] = ((rotorAngle[p.id] || 0) + sp * 360 * dt) % 360;
+      var el = layers.parts.querySelector('[data-rotor="' + p.id + '"]');
+      if (el) el.setAttribute('transform', 'rotate(' + rotorAngle[p.id].toFixed(1) + ')');
+    });
+    if (any) {
+      animId = requestAnimationFrame(animate);
+    } else {
+      animId = null;
+      animLast = null;
+    }
   }
 
   function update() {
@@ -984,15 +1332,24 @@
       ? document.activeElement.getAttribute('data-key') : null;
 
     result = C.solve(state.parts, state.wires);
+    fx = computeFx();
     var angles = clipAngles();
     renderParts();
     renderGlow();
+    renderFx();
     renderTerms();
     renderWires(angles);
     renderTools();
     renderStatus();
     if (checkMissions()) renderMissions();
     renderActionbar();
+
+    var loud = 0;
+    partsOf('buzzer').forEach(function (p) { loud = Math.max(loud, buzzerLoudness(p.id)); });
+    setBuzz(document.hidden ? 0 : loud);
+    if (!animId && partsOf('motor').some(function (p) { return Math.abs(motorSpeed(p.id)) >= 0.05; })) {
+      animId = requestAnimationFrame(animate);
+    }
 
     if (focusedKey) {
       var el = svg.querySelector('[data-key="' + focusedKey + '"]');
@@ -1020,6 +1377,27 @@
   }
   function hideToast() { toastEl.hidden = true; }
 
+  /* ---------- 차시 바꾸기 ---------- */
+
+  function switchLesson(id, fromHash) {
+    if (!lessonById[id] || id === state.lessonId) return;
+    state.tables[state.lessonId] = { parts: state.parts, wires: state.wires };
+    var t = state.tables[id] || { parts: [], wires: [] };
+    state.parts = t.parts;
+    state.wires = t.wires;
+    state.lessonId = id;
+    state.selected = null;
+    nearTerm = null;
+    hideToast();
+    if (!fromHash) {
+      try { history.replaceState(null, '', '#' + id); } catch (err) { location.hash = id; }
+    }
+    renderLessonTabs();
+    buildTools();
+    renderMissions();
+    layout();
+  }
+
   /* ---------- 화면 크기 ---------- */
 
   function layout() {
@@ -1034,8 +1412,8 @@
       $(id).setAttribute('height', fmt(view.H));
     });
     state.parts.forEach(keepOnTable);
-    state.wires.forEach(function (w) {
-      w.ends.forEach(function (e) {
+    state.wires.forEach(function (wire) {
+      wire.ends.forEach(function (e) {
         e.x = clamp(e.x, 10, view.W - 10);
         e.y = clamp(e.y, 10, view.H - 10);
       });
@@ -1048,12 +1426,27 @@
   function init() {
     $('defs').innerHTML = P.DEFS;
 
-    toolList.innerHTML = TOOL_ORDER.map(function (type) {
-      return '<li><button type="button" class="tool" data-type="' + type + '">' +
-        '<span class="tool-art">' + P.icon(type) + '</span>' +
-        '<span><span class="tool-name">' + TYPES[type].name + '</span><span class="tool-count"></span></span>' +
-        '</button></li>';
-    }).join('');
+    var fromHash = location.hash.replace('#', '');
+    if (lessonById[fromHash]) state.lessonId = fromHash;
+    renderLessonTabs();
+    buildTools();
+
+    lessonTabs.addEventListener('click', function (e) {
+      var btn = e.target.closest('[data-lesson]');
+      if (btn) switchLesson(btn.getAttribute('data-lesson'));
+    });
+    lessonTabs.addEventListener('keydown', function (e) {
+      if (e.key !== 'ArrowRight' && e.key !== 'ArrowLeft') return;
+      var i = LESSONS.findIndex(function (l) { return l.id === state.lessonId; });
+      var next = LESSONS[(i + (e.key === 'ArrowRight' ? 1 : LESSONS.length - 1)) % LESSONS.length];
+      switchLesson(next.id);
+      $('tab-' + next.id).focus();
+    });
+    window.addEventListener('hashchange', function () {
+      var id = location.hash.replace('#', '');
+      if (lessonById[id]) switchLesson(id, true);
+    });
+
     toolList.addEventListener('click', function (e) {
       var btn = e.target.closest('.tool');
       if (btn && !btn.disabled) addFromToolbox(btn.getAttribute('data-type'));
@@ -1063,10 +1456,16 @@
       state.showFlow = e.target.checked;
       update();
     });
+    $('soundToggle').addEventListener('change', function (e) {
+      state.sound = e.target.checked;
+      update();
+    });
+    document.addEventListener('visibilitychange', function () { update(); });
 
     $('clearBtn').addEventListener('click', function () {
       if (!state.parts.length && !state.wires.length) return;
       var snapshot = JSON.stringify({ parts: state.parts, wires: state.wires });
+      var lessonId = state.lessonId;
       state.parts = [];
       state.wires = [];
       state.selected = null;
@@ -1076,6 +1475,7 @@
         action: {
           label: '되돌리기',
           run: function () {
+            if (state.lessonId !== lessonId) return;
             var s = JSON.parse(snapshot);
             state.parts = s.parts;
             state.wires = s.wires;
@@ -1096,7 +1496,10 @@
     });
 
     $('resetMissions').addEventListener('click', function () {
-      state.done = {};
+      lesson().missions.forEach(function (m) {
+        m.steps.forEach(function (s) { delete state.steps[m.id + ':' + s.id]; });
+        delete state.memo[m.id];
+      });
       renderMissions();
       update();
     });

@@ -29,13 +29,13 @@
       }
     },
     bulb: {
-      name: '꼬마전구',
+      name: '전구',
       max: 4,
       radius: 40,
       box: { x: -24, y: -40, w: 48, h: 80 },
       terms: {
-        tip: { x: 0, y: 32, out: 90, label: '꼬마전구의 꼭지' },
-        thread: { x: 9, y: 12, out: 0, label: '꼬마전구의 꼭지쇠' }
+        tip: { x: 0, y: 32, out: 90, label: '전구의 꼭지' },
+        thread: { x: 9, y: 12, out: 0, label: '전구의 꼭지쇠' }
       }
     },
     socket: {
@@ -60,14 +60,83 @@
     },
     wire: {
       name: '집게 달린 전선',
-      max: 10
+      max: 12
+    },
+    rodPlastic: rodType('플라스틱 막대'),
+    rodRubber: rodType('고무 막대'),
+    rodMetal: rodType('금속 막대'),
+    motor: {
+      name: '전동기',
+      max: 2,
+      radius: 58,
+      box: { x: -60, y: -40, w: 120, h: 80 },
+      terms: {
+        a: { x: -51, y: 0, out: 180, label: '전동기의 빨간 점 쪽 단자' },
+        b: { x: 51, y: 0, out: 0, label: '전동기의 오른쪽 단자' }
+      }
+    },
+    buzzer: {
+      name: '버저',
+      max: 2,
+      radius: 54,
+      box: { x: -56, y: -34, w: 112, h: 64 },
+      terms: {
+        red: { x: -47, y: 20, out: 180, label: '버저의 빨간색 전선' },
+        black: { x: 47, y: 20, out: 0, label: '버저의 검은색 전선' }
+      }
+    },
+    magnet: {
+      name: '전자석',
+      max: 1,
+      radius: 84,
+      box: { x: -86, y: -20, w: 164, h: 58 },
+      terms: {
+        a: { x: -46, y: 31, out: 90, label: '전자석의 왼쪽 에나멜선 끝' },
+        b: { x: 46, y: 31, out: 90, label: '전자석의 오른쪽 에나멜선 끝' }
+      }
+    },
+    rings: {
+      name: '둥근 철 고리',
+      max: 1,
+      radius: 46,
+      box: { x: -46, y: -34, w: 92, h: 70 },
+      terms: {}
+    },
+    compass: {
+      name: '나침반',
+      max: 2,
+      radius: 38,
+      box: { x: -38, y: -38, w: 76, h: 76 },
+      terms: {}
     }
   };
 
-  // 끼운 꼬마전구가 놓이는 자리 (전구 끼우개 좌표)
+  function rodType(name) {
+    return {
+      name: name,
+      max: 1,
+      radius: 80,
+      box: { x: -80, y: -16, w: 160, h: 32 },
+      terms: {
+        a: { x: -70, y: 0, out: 180, label: name + '의 왼쪽 끝' },
+        b: { x: 70, y: 0, out: 0, label: name + '의 오른쪽 끝' }
+      }
+    };
+  }
+
+  // 끼운 전구가 놓이는 자리 (전구 끼우개 좌표)
   var SOCKET_SLOT = { x: 0, y: -34 };
-  // 꼬마전구 유리구의 중심 (꼬마전구 좌표)
+  // 전구 유리구의 중심 (전구 좌표)
   var GLOBE = { x: 0, y: -17 };
+  // 끝끼리 붙인 전지 끼우개 두 개의 중심 사이 거리
+  var JOIN_GAP = 184;
+  // 전자석 볼트의 양 끝. 전류가 a → b로 흐르면 [1] 쪽이 N극
+  var MAGNET_ENDS = [{ x: -82, y: 0 }, { x: 72, y: 0 }];
+  // 둥근 철 고리 더미에 놓인 고리 자리
+  var RING_SPOTS = [
+    [-24, -16], [-9, -22], [7, -18], [22, -12], [-30, 0], [-15, -5], [1, -3], [16, 2],
+    [30, 9], [-22, 14], [-7, 10], [9, 15], [23, 22], [-12, 25], [3, 27], [-28, 22]
+  ];
   // 집게 끝에서 전선이 붙는 곳까지의 거리
   var CLIP_LENGTH = 36;
 
@@ -101,7 +170,19 @@
     '<path d="M20 0H0V20" class="mat-line" fill="none" stroke-width="1"/></pattern>',
     '<pattern id="gridMajor" width="100" height="100" patternUnits="userSpaceOnUse">',
     '<path d="M100 0H0V100" class="mat-line-major" fill="none" stroke-width="1.4"/></pattern>',
-    '<clipPath id="socketClip" clipPathUnits="userSpaceOnUse"><rect x="-40" y="-120" width="80" height="99"/></clipPath>'
+    '<clipPath id="socketClip" clipPathUnits="userSpaceOnUse"><rect x="-40" y="-120" width="80" height="99"/></clipPath>',
+    '<linearGradient id="gPlastic" x1="0" y1="0" x2="0" y2="1">',
+    '<stop offset="0" stop-color="#eaf6ff"/><stop offset=".5" stop-color="#9fd0f2"/><stop offset="1" stop-color="#c7e5f8"/></linearGradient>',
+    '<linearGradient id="gRubber" x1="0" y1="0" x2="0" y2="1">',
+    '<stop offset="0" stop-color="#55585c"/><stop offset=".5" stop-color="#232527"/><stop offset="1" stop-color="#3a3c3f"/></linearGradient>',
+    '<linearGradient id="gMount" x1="0" y1="0" x2="0" y2="1">',
+    '<stop offset="0" stop-color="#e9edf1"/><stop offset="1" stop-color="#b9c2cb"/></linearGradient>',
+    '<radialGradient id="gCan" cx=".38" cy=".35" r=".75">',
+    '<stop offset="0" stop-color="#f7f8f9"/><stop offset=".6" stop-color="#b4b9bf"/><stop offset="1" stop-color="#868c93"/></radialGradient>',
+    '<radialGradient id="gBuzz" cx=".38" cy=".35" r=".75">',
+    '<stop offset="0" stop-color="#55595e"/><stop offset="1" stop-color="#111315"/></radialGradient>',
+    '<pattern id="coil" width="3.2" height="22" patternUnits="userSpaceOnUse">',
+    '<rect width="3.2" height="22" fill="#c27433"/><rect width="1" height="22" fill="#8a4a1c"/><rect x="1.4" width=".8" height="22" fill="#e9a463"/></pattern>'
   ].join('');
 
   function battery(opts) {
@@ -203,7 +284,117 @@
       '<rect x="52" y="-5" width="16" height="3" rx="1.5" fill="#ffffff" opacity=".35"/>',
       '</g>',
       '<circle cx="-41" cy="0" r="3" fill="#6b7177"/>',
-      '<text x="-4" y="22" class="svg-label switch-state">' + (opts.closed ? '켜짐' : '꺼짐') + '</text>'
+      '<text x="-4" y="22" class="svg-label switch-state">' + (opts.closed ? '닫힘' : '열림') + '</text>'
+    ].join('');
+  }
+
+  var RODS = {
+    rodPlastic: { fill: 'url(#gPlastic)', ink: '#1f5279', rx: 8, label: '플라스틱' },
+    rodRubber: { fill: 'url(#gRubber)', ink: '#e6e6e6', rx: 8, label: '고무' },
+    rodMetal: { fill: 'url(#gMetal)', ink: '#3f454b', rx: 3, label: '금속' }
+  };
+
+  function rod(type) {
+    var r = RODS[type];
+    return '<rect x="-74" y="-8" width="148" height="16" rx="' + r.rx + '" fill="' + r.fill + '" stroke="#000000" stroke-opacity=".25" stroke-width="1"/>' +
+      '<text x="0" y="4" class="svg-label rod-label" fill="' + r.ink + '">' + r.label + ' 막대</text>';
+  }
+
+  // 위에서 내려다본 전동기. 날개(rotor)는 app.js가 돌린다.
+  function motor(opts) {
+    opts = opts || {};
+    var blades = '';
+    for (var k = 0; k < 3; k++) {
+      blades += '<path d="M0 -4C10 -7 27 -9 33 -2C34 2 30 6 24 6C14 6 6 5 0 4Z" fill="#e8742f" stroke="#a9481a" stroke-width=".8" transform="rotate(' + k * 120 + ')"/>';
+    }
+    return [
+      '<rect x="-59" y="-6" width="18" height="12" rx="2" fill="url(#gMetal)"/>',
+      '<circle cx="-51" cy="0" r="2.4" fill="#6b7177"/>',
+      '<rect x="41" y="-6" width="18" height="12" rx="2" fill="url(#gMetal)"/>',
+      '<circle cx="51" cy="0" r="2.4" fill="#6b7177"/>',
+      '<rect x="-44" y="-32" width="88" height="64" rx="10" fill="url(#gMount)" stroke="#8d98a3" stroke-width="1"/>',
+      '<path d="M-44 0H-24M24 0H44" stroke="#aab0b6" stroke-width="3"/>',
+      '<circle cx="-33" cy="-19" r="4" fill="#d2382d"/>',
+      '<circle r="24" fill="url(#gCan)" stroke="#7b8187" stroke-width="1"/>',
+      '<circle r="15" fill="#c3c8cd" stroke="#9aa0a7" stroke-width="1"/>',
+      opts.fast ? '<circle r="34" fill="#e8742f" opacity=".16"/>' : '',
+      '<g class="rotor" data-rotor="' + (opts.id || '') + '" transform="rotate(' + (opts.angle || 0).toFixed(1) + ')">',
+      blades,
+      '<circle r="6" fill="#c45a1e"/><circle r="2" fill="#7a3510"/>',
+      '</g>'
+    ].join('');
+  }
+
+  function buzzer(opts) {
+    opts = opts || {};
+    var loud = opts.loudness || 0;
+    var waves = '';
+    if (loud > 0) {
+      var n = loud > 0.75 ? 3 : 2;
+      for (var k = 0; k < n; k++) {
+        var r = 26 + k * 9;
+        waves += '<path class="wave" style="animation-delay:' + (k * 0.15) + 's" d="M' + (r * 0.5).toFixed(1) + ' ' + (-4 - r * 0.87).toFixed(1) +
+          'A' + r + ' ' + r + ' 0 0 1 ' + r + ' -4" fill="none" stroke="#fff3b0" stroke-width="' + (1.5 + loud * 2).toFixed(1) +
+          '" stroke-linecap="round" opacity="' + Math.min(1, 0.35 + loud * 0.6).toFixed(2) + '"/>';
+      }
+    }
+    return [
+      '<path d="M-12 14C-18 22 -30 22 -40 20" stroke="#d2382d" stroke-width="3.6" fill="none" stroke-linecap="round"/>',
+      '<path d="M12 14C18 22 30 22 40 20" stroke="#26292c" stroke-width="3.6" fill="none" stroke-linecap="round"/>',
+      '<rect x="-50" y="18" width="11" height="4" rx="1.5" fill="url(#gMetal)"/>',
+      '<rect x="39" y="18" width="11" height="4" rx="1.5" fill="url(#gMetal)"/>',
+      '<rect x="-28" y="-28" width="56" height="44" rx="8" fill="url(#gCream)" stroke="#b3a88f" stroke-width="1"/>',
+      '<circle cx="0" cy="-6" r="18" fill="url(#gBuzz)"/>',
+      '<circle cx="0" cy="-6" r="3.2" fill="#000000"/>',
+      '<text x="-21" y="12" class="svg-label buzz-sign">+</text>',
+      waves
+    ].join('');
+  }
+
+  function magnet() {
+    return [
+      '<path d="M-50 9C-54 18 -48 22 -46 26" stroke="#b8692e" stroke-width="2" fill="none"/>',
+      '<path d="M50 9C54 18 48 22 46 26" stroke="#b8692e" stroke-width="2" fill="none"/>',
+      '<path d="M-46 25V33M46 25V33" stroke="#d9dde1" stroke-width="2.4" stroke-linecap="round"/>',
+      '<rect x="-70" y="-5" width="140" height="10" rx="2" fill="url(#gMetal)"/>',
+      '<path d="M58 -5V5M61.5 -5V5M65 -5V5" stroke="#868c92" stroke-width="1"/>',
+      '<path d="M-70 -13H-76A6 13 0 0 0 -76 13H-70Z" fill="url(#gMetal)" stroke="#868c92" stroke-width=".8"/>',
+      '<rect x="-56" y="-11" width="110" height="22" rx="4" fill="url(#coil)"/>',
+      '<rect x="-56" y="-11" width="110" height="7" rx="3" fill="#ffffff" opacity=".18"/>'
+    ].join('');
+  }
+
+  function ring(x, y) {
+    return '<circle cx="' + x + '" cy="' + y + '" r="7" fill="none" stroke="#4f565c" stroke-width="3.6"/>' +
+      '<circle cx="' + x + '" cy="' + y + '" r="7" fill="none" stroke="#c9ced3" stroke-width="1.8"/>';
+  }
+
+  function rings(opts) {
+    opts = opts || {};
+    var count = opts.count === undefined ? RING_SPOTS.length : opts.count;
+    return '<rect x="-46" y="-34" width="92" height="70" rx="20" fill="#000000" opacity=".08"/>' +
+      RING_SPOTS.slice(0, count).map(function (s) { return ring(s[0], s[1]); }).join('');
+  }
+
+  // needle: 바늘의 N극(빨간 쪽)이 가리키는 방향(도, 이 부품 좌표)
+  function compass(opts) {
+    opts = opts || {};
+    var ticks = '';
+    for (var k = 0; k < 12; k++) {
+      ticks += '<path d="M0 -27V' + (k % 3 === 0 ? -22 : -24.5) + '" stroke="#7b8187" stroke-width="1.2" transform="rotate(' + k * 30 + ')"/>';
+    }
+    var a = opts.needle === undefined ? -90 : opts.needle;
+    return [
+      '<circle r="34" fill="url(#gMetal)" stroke="#868c92" stroke-width="1"/>',
+      '<circle r="29" fill="#fbfaf4" stroke="#a7adb3" stroke-width="1"/>',
+      ticks,
+      '<text x="0" y="-12" class="svg-label compass-n">N</text>',
+      '<g transform="rotate(' + a.toFixed(1) + ')">',
+      '<path d="M0 -4.5L24 0L0 4.5Z" fill="#d2382d"/>',
+      '<path d="M0 -4.5L-24 0L0 4.5Z" fill="#9aa0a7"/>',
+      '</g>',
+      '<circle r="3.4" fill="#4a5056"/>',
+      '<path d="M-18 -18A25 25 0 0 1 4 -27" stroke="#ffffff" stroke-width="3" fill="none" opacity=".7" stroke-linecap="round"/>'
     ].join('');
   }
 
@@ -217,7 +408,13 @@
     ].join('');
   }
 
-  var DRAW = { battery: battery, holder: holder, bulb: bulb, socket: socket, switch: switchPart };
+  var DRAW = {
+    battery: battery, holder: holder, bulb: bulb, socket: socket, switch: switchPart,
+    rodPlastic: function () { return rod('rodPlastic'); },
+    rodRubber: function () { return rod('rodRubber'); },
+    rodMetal: function () { return rod('rodMetal'); },
+    motor: motor, buzzer: buzzer, magnet: magnet, rings: rings, compass: compass
+  };
 
   function draw(type, opts) {
     return DRAW[type](opts);
@@ -236,7 +433,15 @@
       holder: '-106 -34 212 68',
       bulb: '-30 -42 60 80',
       socket: '-78 -74 156 112',
-      switch: '-94 -34 188 68'
+      switch: '-94 -34 188 68',
+      rodPlastic: '-80 -24 160 48',
+      rodRubber: '-80 -24 160 48',
+      rodMetal: '-80 -24 160 48',
+      motor: '-62 -42 124 84',
+      buzzer: '-56 -34 112 64',
+      magnet: '-86 -30 164 70',
+      rings: '-44 -34 88 68',
+      compass: '-38 -38 76 76'
     }[type];
     var opts = type === 'switch' ? { closed: false } : {};
     return '<svg viewBox="' + vb + '" aria-hidden="true" focusable="false">' + draw(type, opts) + '</svg>';
@@ -247,6 +452,10 @@
     DEFS: DEFS,
     SOCKET_SLOT: SOCKET_SLOT,
     GLOBE: GLOBE,
+    JOIN_GAP: JOIN_GAP,
+    MAGNET_ENDS: MAGNET_ENDS,
+    RING_TOTAL: RING_SPOTS.length,
+    ring: ring,
     CLIP_LENGTH: CLIP_LENGTH,
     draw: draw,
     clip: clip,

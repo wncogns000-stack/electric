@@ -126,6 +126,32 @@ button { font: inherit; color: inherit; }
 
 .brand { min-width: 0; }
 
+.lesson-tabs {
+  display: flex;
+  gap: 4px;
+  padding: 4px;
+  border-radius: 12px;
+  background: var(--surface);
+  border: 1px solid var(--line);
+  overflow-x: auto;
+  max-width: 100%;
+}
+.lesson-tab {
+  flex: none;
+  min-height: 36px;
+  padding: 0 14px;
+  border: 0;
+  border-radius: 9px;
+  background: transparent;
+  color: var(--muted);
+  font-weight: 600;
+  font-size: var(--step--1);
+  white-space: nowrap;
+  cursor: pointer;
+}
+.lesson-tab:hover { color: var(--ink); background: var(--surface-2); }
+.lesson-tab[aria-selected="true"] { background: var(--accent); color: var(--accent-ink); }
+
 .brand h1 {
   margin: 0;
   font-family: var(--font-display);
@@ -354,6 +380,13 @@ button { font: inherit; color: inherit; }
 .bat-sign { font-size: 15px; font-weight: 600; fill: #ffffff; }
 .mat-sign { font-size: 16px; font-weight: 600; fill: var(--mat-ink); }
 .switch-state { font-size: 10px; font-weight: 600; fill: #5a3d16; }
+.rod-label { font-size: 10px; font-weight: 600; }
+.buzz-sign { font-size: 12px; font-weight: 600; fill: #b3261e; }
+.compass-n { font-size: 9px; font-weight: 600; fill: #b3261e; }
+.fx-layer { pointer-events: none; }
+.wave { animation: wave 0.5s ease-in-out infinite alternate; }
+@keyframes wave { from { opacity: 0.25; } to { opacity: 1; } }
+.part.is-grouped .select-box { stroke-opacity: 0.6; }
 
 .part { cursor: grab; }
 .part:focus { outline: none; }
@@ -529,14 +562,20 @@ button { font: inherit; color: inherit; }
 .mission {
   display: grid;
   grid-template-columns: 30px minmax(0, 1fr);
-  gap: 4px 10px;
+  align-items: start;
+  gap: 10px;
   padding: 12px;
   border-radius: 12px;
   border: 1px solid var(--line);
   background: var(--surface-2);
 }
+.mission-body {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  min-width: 0;
+}
 .mission-num {
-  grid-row: span 4;
   display: grid;
   place-items: center;
   width: 30px;
@@ -556,10 +595,62 @@ button { font: inherit; color: inherit; }
 }
 .mission p { margin: 0; font-size: var(--step--1); color: var(--muted); }
 .mission .think { color: var(--ink); }
+.mission .tip { color: var(--ink); }
+.mission .tip b { color: var(--ok); font-weight: 600; }
+.steps {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin: 2px 0;
+  padding: 0;
+  list-style: none;
+}
+.step {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 2px 9px 2px 7px;
+  border-radius: 999px;
+  border: 1px dashed var(--line);
+  background: var(--surface);
+  color: var(--muted);
+  font-size: 0.75rem;
+  font-weight: 600;
+}
+.step::before {
+  content: "";
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  border: 1.5px solid currentColor;
+}
+.step.is-seen { border-style: solid; border-color: var(--ok); color: var(--ok); }
+.step.is-seen::before { background: currentColor; }
+.mission-note {
+  padding: 12px;
+  border-radius: 12px;
+  border: 1px dashed var(--line);
+  color: var(--muted);
+  font-size: var(--step--1);
+}
+.lesson-title {
+  margin: -4px 0 0;
+  color: var(--muted);
+  font-size: var(--step--1);
+  font-weight: 500;
+  text-wrap: balance;
+}
+.visually-hidden {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip: rect(0 0 0 0);
+  white-space: nowrap;
+}
 .mission .think b { color: var(--accent); font-weight: 600; }
 .mission-state {
-  grid-column: 2;
-  justify-self: start;
+  align-self: flex-start;
   margin-top: 4px;
   padding: 1px 9px;
   border-radius: 999px;
@@ -655,6 +746,6 @@ button { font: inherit; color: inherit; }
 }
 
 @media (prefers-reduced-motion: reduce) {
-  .flow, .heat, .wire-hot, .term-ring.is-armed, .mission.just-done { animation: none; }
+  .flow, .heat, .wire-hot, .term-ring.is-armed, .mission.just-done, .wave { animation: none; }
   .flow { stroke-dasharray: 2 10; }
 }

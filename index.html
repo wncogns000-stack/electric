@@ -14,13 +14,19 @@
   <header class="topbar">
     <div class="brand">
       <h1>전기 회로 실험실</h1>
-      <p>실험 도구를 테이블에 올리고 집게 달린 전선으로 이어 꼬마전구에 불을 켜 보세요.</p>
+      <p>과학 6-2 · 3. 전기의 이용</p>
     </div>
+    <nav class="lesson-tabs" id="lessonTabs" role="tablist" aria-label="실험 차시"></nav>
     <div class="topbar-actions">
       <label class="toggle" for="flowToggle">
         <input type="checkbox" id="flowToggle">
         <span class="toggle-track" aria-hidden="true"><span class="toggle-thumb"></span></span>
         <span>전기가 흐르는 길 보기</span>
+      </label>
+      <label class="toggle" for="soundToggle">
+        <input type="checkbox" id="soundToggle" checked>
+        <span class="toggle-track" aria-hidden="true"><span class="toggle-thumb"></span></span>
+        <span>소리</span>
       </label>
       <button type="button" class="btn" id="clearBtn">모두 치우기</button>
       <button type="button" class="btn btn-quiet" id="helpBtn" aria-haspopup="dialog">사용 방법</button>
@@ -46,6 +52,7 @@
         <rect id="matMajor" x="0" y="0" width="1000" height="620" fill="url(#gridMajor)"></rect>
         <g id="layerParts"></g>
         <g id="layerGlow" class="glow-layer"></g>
+        <g id="layerFx" class="fx-layer"></g>
         <g id="layerWires"></g>
         <g id="layerTerms"></g>
         <g id="layerClips"></g>
@@ -64,6 +71,7 @@
       <h2 id="actTitle" class="panel-title">실험 활동</h2>
       <span class="progress" id="progress"></span>
     </div>
+    <p class="lesson-title" id="lessonTitle"></p>
     <ol class="mission-list" id="missionList"></ol>
     <button type="button" class="link-btn" id="resetMissions">활동 기록 지우기</button>
   </aside>
@@ -73,11 +81,14 @@
   <div class="help-inner">
     <h2 id="helpTitle">사용 방법</h2>
     <ol class="help-steps">
-      <li><b>부품 올리기</b> 왼쪽 ‘실험 도구’에서 부품을 누르면 실험 테이블에 올라가요.</li>
-      <li><b>옮기기·돌리기</b> 부품을 끌어서 옮겨요. 부품을 한 번 누르면 돌리기, 치우기 단추가 나와요.</li>
-      <li><b>끼우기</b> 전지는 전지 끼우개 위로, 꼬마전구는 전구 끼우개 위로 끌어다 놓으면 끼워져요. 전지를 누른 다음 전지 끼우개를 눌러도 돼요.</li>
-      <li><b>전선 잇기</b> 집게 달린 전선의 집게를 끌어서 금속 부분에 물려요. 금속 부분 두 곳을 차례로 눌러도 테이블에 있는 전선으로 이어져요.</li>
-      <li><b>스위치</b> 스위치를 누르면 켜지고, 한 번 더 누르면 꺼져요.</li>
+      <li><b>차시 고르기</b> 위쪽에서 차시를 고르면 그 차시의 실험 도구와 실험 활동이 나와요. 차시마다 실험 테이블이 따로 있어요.</li>
+      <li><b>부품 올리기</b> ‘실험 도구’에서 부품을 누르면 실험 테이블에 올라가요.</li>
+      <li><b>옮기기·돌리기</b> 부품을 끌어서 옮겨요. 부품을 한 번 누르면 돌리기, 치우기 같은 단추가 나와요.</li>
+      <li><b>끼우기</b> 전지는 전지 끼우개 위로, 전구는 전구 끼우개 위로 끌어다 놓으면 끼워져요. 전지를 누른 다음 전지 끼우개를 눌러도 돼요.</li>
+      <li><b>전지 끼우개 붙이기</b> 전지 끼우개를 다른 전지 끼우개의 끝에 끌어다 대면 서로 붙어요. 떼려면 끼우개를 누르고 ‘끼우개 떼기’를 눌러요.</li>
+      <li><b>전선 잇기</b> 집게 달린 전선의 집게(색 있는 손잡이)를 끌어서 금속 부분에 물려요. 금속 부분 두 곳을 차례로 눌러도 테이블에 있는 전선으로 이어져요.</li>
+      <li><b>스위치</b> 스위치를 누르면 닫히고, 한 번 더 누르면 열려요.</li>
+      <li><b>전자석</b> 전자석의 끝부분을 둥근 철 고리나 나침반 가까이 가져가 보세요.</li>
     </ol>
     <p class="help-safety"><b>안전</b> 실제 실험에서 전구 없이 전지의 (+)극과 (−)극을 전선으로 바로 이으면 전지와 전선이 뜨거워져 위험해요. 이 실험실에서는 그렇게 이으면 경고가 나타나요.</p>
     <button type="button" class="btn btn-primary" id="helpClose">닫기</button>
@@ -86,6 +97,7 @@
 
 <script src="js/circuit.js"></script>
 <script src="js/parts.js"></script>
+<script src="js/lessons.js"></script>
 <script src="js/app.js"></script>
 </body>
 </html>

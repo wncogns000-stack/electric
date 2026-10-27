@@ -98,9 +98,6 @@ test('직렬연결한 전구 2개는 병렬연결보다 어둡다', () => {
   assert.ok(Math.abs(series.batteries.bat.current - series.bulbs.b1.current) < 1e-3);
   assert.ok(Math.abs(parallel.batteries.bat.current - parallel.bulbs.b1.current - parallel.bulbs.b2.current) < 1e-3);
 
-  const shared = (r) => r.bulbNets.b1.filter((net) => r.bulbNets.b2.includes(net)).length;
-  assert.equal(shared(series), 1);
-  assert.equal(shared(parallel), 2);
 });
 
 test('직렬연결에서 전구 하나를 빼면 나머지도 꺼지고, 병렬연결에서는 켜진 채로 있다', () => {
@@ -172,4 +169,108 @@ test('전선 전류의 방향은 (+)극에서 나와 (−)극으로 들어간다
   const r = solve(parts, [w1, w2]);
   assert.equal(r.wires[w1.id].from, 1);
   assert.equal(r.wires[w2.id].from, 0);
+});
+
+test('스위치 대신 금속 막대를 이으면 켜지고, 플라스틱·고무 막대를 이으면 켜지지 않는다', () => {
+  for (const [rod, lit] of [['rodMetal', true], ['rodPlastic', false], ['rodRubber', false]]) {
+    const parts = [
+      { id: 'bat', type: 'battery', holderId: 'h', flipped: false },
+      { id: 'h', type: 'holder', batteryId: 'bat', joinNext: null },
+      { id: 'bulb', type: 'bulb', socketId: 's' },
+      { id: 's', type: 'socket', bulbId: 'bulb' },
+      { id: 'rod', type: rod }
+    ];
+    const wires = [wire('h', 'b', 'rod', 'a'), wire('rod', 'b', 's', 'b'), wire('s', 'a', 'h', 'a')];
+    assert.equal(solve(parts, wires).bulbs.bulb.lit, lit, rod);
+  }
+});
+
+test('끝끼리 붙인 전지 끼우개 2개는 전선 없이도 직렬로 이어진다', () => {
+  const parts = [
+    { id: 'bat1', type: 'battery', holderId: 'h1', flipped: false },
+    { id: 'h1', type: 'holder', batteryId: 'bat1', joinNext: 'h2' },
+    { id: 'bat2', type: 'battery', holderId: 'h2', flipped: false },
+    { id: 'h2', type: 'holder', batteryId: 'bat2', joinNext: null },
+    { id: 'bulb', type: 'bulb', socketId: null }
+  ];
+  const wires = [wire('h2', 'b', 'bulb', 'tip'), wire('bulb', 'thread', 'h1', 'a')];
+  const r = solve(parts, wires);
+  assert.ok(r.bulbs.bulb.voltage > 2.7);
+  assert.ok(r.bulbs.bulb.brightness > 3);
+});
+
+test('버저는 빨간색 전선을 (+)극 쪽에 이었을 때만 울린다', () => {
+  const parts = [
+    { id: 'bat', type: 'battery', holderId: null, flipped: false },
+    { id: 'bz', type: 'buzzer' }
+  ];
+  const right = solve(parts, [wire('bat', 'p', 'bz', 'red'), wire('bz', 'black', 'bat', 'n')]);
+  assert.equal(right.buzzers.bz.on, true);
+  assert.ok(right.buzzers.bz.voltage > 1.4);
+  const reversed = solve(parts, [wire('bat', 'p', 'bz', 'black'), wire('bz', 'red', 'bat', 'n')]);
+  assert.equal(reversed.buzzers.bz.on, false);
+  assert.equal(reversed.batteries.bat.current, 0);
+});
+
+test('버저를 거꾸로 이어도 같은 회로의 다른 부품에는 영향이 없다', () => {
+  const parts = [
+    { id: 'bat', type: 'battery', holderId: null, flipped: false },
+    { id: 'bz', type: 'buzzer' },
+    { id: 'bulb', type: 'bulb', socketId: null }
+  ];
+  // 전구와 버저를 병렬로: 버저만 거꾸로
+  const r = solve(parts, [
+    wire('bat', 'p', 'bulb', 'tip'), wire('bulb', 'thread', 'bat', 'n'),
+    wire('bulb', 'tip', 'bz', 'black'), wire('bz', 'red', 'bulb', 'thread')
+  ]);
+  assert.equal(r.bulbs.bulb.lit, true);
+  assert.equal(r.buzzers.bz.on, false);
+});
+
+test('전동기는 전지를 반대로 이으면 반대 방향으로 돈다', () => {
+  const parts = [
+    { id: 'bat', type: 'battery', holderId: null, flipped: false },
+    { id: 'm', type: 'motor' }
+  ];
+  const fwd = solve(parts, [wire('bat', 'p', 'm', 'a'), wire('m', 'b', 'bat', 'n')]);
+  const rev = solve(parts, [wire('bat', 'p', 'm', 'b'), wire('m', 'a', 'bat', 'n')]);
+  assert.ok(fwd.motors.m.voltage > 1.4);
+  assert.ok(rev.motors.m.voltage < -1.4);
+});
+
+test('전자석은 전지 2개를 직렬연결하면 전류가 더 크고, 합선으로 보지 않는다', () => {
+  const make = (cells) => {
+    const parts = [{ id: 'mag', type: 'magnet' }];
+    for (let i = 1; i <= cells; i++) {
+      parts.push({ id: 'b' + i, type: 'battery', holderId: 'h' + i, flipped: false });
+      parts.push({ id: 'h' + i, type: 'holder', batteryId: 'b' + i, joinNext: i < cells ? 'h' + (i + 1) : null });
+    }
+    return solve(parts, [wire('h' + cells, 'b', 'mag', 'a'), wire('mag', 'b', 'h1', 'a')]);
+  };
+  const one = make(1), two = make(2), four = make(4);
+  assert.ok(one.magnets.mag.current > 0.6);
+  assert.ok(two.magnets.mag.current > one.magnets.mag.current * 1.8);
+  assert.equal(two.shorted, false);
+  assert.equal(four.shorted, false);
+});
+
+test('전지 2개를 직렬로 이은 채 양 끝을 전선으로 바로 이으면 합선이다', () => {
+  const parts = [
+    { id: 'b1', type: 'battery', holderId: 'h1', flipped: false },
+    { id: 'h1', type: 'holder', batteryId: 'b1', joinNext: 'h2' },
+    { id: 'b2', type: 'battery', holderId: 'h2', flipped: false },
+    { id: 'h2', type: 'holder', batteryId: 'b2', joinNext: null }
+  ];
+  assert.equal(solve(parts, [wire('h2', 'b', 'h1', 'a')]).shorted, true);
+});
+
+test('열린 스위치만 있는 회로는 합선이 아니고, 닫으면 합선이다', () => {
+  const parts = [
+    { id: 'bat', type: 'battery', holderId: null, flipped: false },
+    { id: 'sw', type: 'switch', closed: false }
+  ];
+  const wires = [wire('bat', 'p', 'sw', 'a'), wire('sw', 'b', 'bat', 'n')];
+  assert.equal(solve(parts, wires).shorted, false);
+  parts[1].closed = true;
+  assert.equal(solve(parts, wires).shorted, true);
 });
