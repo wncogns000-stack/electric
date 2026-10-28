@@ -74,12 +74,14 @@ test('처음 세 폭탄은 쉬운 고장만 나오고, 16번째 폭탄까지 모
   }
 });
 
-test('제한 시간은 60초에서 줄어 20초에서 멈추고, 고장이 많으면 늘어난다', () => {
-  assert.equal(B.timeLimit(1, 1), 60);
-  assert.equal(B.timeLimit(2, 1), 56);
-  assert.equal(B.timeLimit(11, 1), 20);
-  assert.equal(B.timeLimit(30, 1), 20);
-  assert.equal(B.timeLimit(30, 2), 30);
+test('제한 시간은 40초에서 줄어 7초에서 멈추고, 고장이 많으면 늘어난다', () => {
+  assert.equal(B.timeLimit(1, 1), 40);
+  assert.equal(B.timeLimit(2, 1), 37);
+  assert.equal(B.timeLimit(11, 1), 10);
+  assert.equal(B.timeLimit(12, 1), 7);
+  assert.equal(B.timeLimit(30, 1), 7);
+  assert.equal(B.timeLimit(30, 2), 14);
+  assert.equal(B.timeLimit(30, 3), 21);
   for (let n = 2; n <= 30; n++) assert.ok(B.timeLimit(n, 1) <= B.timeLimit(n - 1, 1));
 });
 

@@ -116,9 +116,9 @@
 
   function tierOf(n) { return n <= 3 ? 1 : n <= 7 ? 2 : 3; }
 
-  // 제한 시간(초): 처음 60초에서 폭탄마다 4초씩 줄어 20초까지. 고장이 하나 늘 때마다 10초 더
+  // 제한 시간(초): 처음 40초에서 폭탄마다 3초씩 줄어 12번째부터 7초. 고장이 하나 늘 때마다 7초 더
   function timeLimit(n, faultCount) {
-    return Math.max(20, 60 - 4 * (n - 1)) + 10 * (faultCount - 1);
+    return Math.max(7, 40 - 3 * (n - 1)) + 7 * (faultCount - 1);
   }
 
   /* ---------- 회로 판정 ---------- */
