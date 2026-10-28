@@ -222,14 +222,22 @@
     ].join('');
   }
 
+  // broken: 필라멘트가 끊어진 전구 (1, 2는 끊어진 쪽만 다르다)
   function bulb(opts) {
     opts = opts || {};
     var b = opts.brightness || 0;
     var lit = b > 0.03;
     var filament = lit ? (b > 0.5 ? '#fff6c2' : '#ffb347') : '#5f6266';
+    var wire = '<path d="M-6 -12q1.5 -4 3 0t3 0t3 0t3 0" stroke="' + filament + '" stroke-width="' + (lit ? 2 : 1.4) + '" fill="none" stroke-linecap="round"/>';
+    if (opts.broken) {
+      wire = '<g' + (opts.broken === 2 ? ' transform="scale(-1 1)"' : '') + '>' +
+        '<path d="M-6 -12q1.5 -4 3 0t1.4 0" stroke="#5f6266" stroke-width="1.4" fill="none" stroke-linecap="round"/>' +
+        '<path d="M6 -12q-1.5 -4 -3 0l-1.6 5.5" stroke="#5f6266" stroke-width="1.4" fill="none" stroke-linecap="round"/></g>' +
+        '<ellipse cx="3" cy="-25" rx="10" ry="6" fill="#3b342c" opacity=".38"/>';
+    }
     return [
       '<path d="M-5 4L-6 -12M5 4L6 -12" stroke="#8b9096" stroke-width="1.3" fill="none"/>',
-      '<path d="M-6 -12q1.5 -4 3 0t3 0t3 0t3 0" stroke="' + filament + '" stroke-width="' + (lit ? 2 : 1.4) + '" fill="none" stroke-linecap="round"/>',
+      wire,
       '<path d="M-7 3C-7 -2 -19 -6 -19 -18A19 19 0 1 1 19 -18C19 -6 7 -2 7 3Z" fill="url(#gGlass)" stroke="#ffffff" stroke-opacity=".75" stroke-width="1.2"/>',
       lit ? '<circle cx="0" cy="-15" r="' + (8 + Math.min(b, 3) * 3).toFixed(1) + '" fill="#fff3b0" opacity="' + Math.min(0.85, 0.25 + b * 0.5).toFixed(2) + '"/>' : '',
       '<path d="M-11 -27A12 12 0 0 1 -2 -33" stroke="#ffffff" stroke-width="2.4" stroke-linecap="round" fill="none" opacity=".85"/>',
@@ -245,7 +253,7 @@
     var withBulb = '';
     if (opts.bulb) {
       withBulb = '<g clip-path="url(#socketClip)"><g transform="translate(' + SOCKET_SLOT.x + ' ' + SOCKET_SLOT.y + ')">' +
-        bulb({ brightness: opts.bulb.brightness }) + '</g></g>';
+        bulb({ brightness: opts.bulb.brightness, broken: opts.bulb.broken }) + '</g></g>';
     }
     return [
       '<rect x="-73" y="8" width="18" height="12" rx="2" fill="url(#gMetal)"/>',

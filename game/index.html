@@ -1,0 +1,110 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>시한폭탄 처리반</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Black+Han+Sans&family=IBM+Plex+Sans+KR:wght@400;500;600&display=swap">
+<link rel="stylesheet" href="game.css">
+</head>
+<body>
+<div class="game">
+  <header class="hud">
+    <div class="hud-title">
+      <h1>시한폭탄 처리반</h1>
+      <p>정지 회로를 고쳐 정지 램프에 불을 켜면 폭탄이 멈춰요.</p>
+    </div>
+    <dl class="hud-scores">
+      <div class="score-chip">
+        <dt>해체한 폭탄</dt>
+        <dd id="score">0</dd>
+      </div>
+      <div class="score-chip">
+        <dt>이 기기 최고 기록</dt>
+        <dd id="best">0</dd>
+      </div>
+    </dl>
+    <div class="hud-actions">
+      <button type="button" class="btn btn-hint" id="hintBtn" disabled>힌트 <small>−5초</small></button>
+      <button type="button" class="btn" id="soundBtn" aria-pressed="true">소리 켜짐</button>
+      <button type="button" class="btn btn-quiet" id="quitBtn" hidden>그만하기</button>
+    </div>
+  </header>
+
+  <main class="stage" id="stage">
+    <svg id="bomb" class="bomb" role="application" aria-label="폭탄의 정지 회로. 집게를 금속 부분에 물리고, 부품 상자의 새 부품을 끌어다 바꿔 끼웁니다." preserveAspectRatio="xMidYMid meet">
+      <defs id="defs"></defs>
+      <g id="casing"></g>
+      <g id="timer"></g>
+      <g id="layerParts"></g>
+      <g id="layerGlow" class="glow-layer"></g>
+      <g id="layerTags" class="fx-layer"></g>
+      <g id="layerWires"></g>
+      <g id="layerTerms"></g>
+      <g id="layerClips"></g>
+      <g id="layerTray"></g>
+      <g id="layerHint" class="fx-layer"></g>
+      <g id="layerCarry" class="fx-layer"></g>
+    </svg>
+    <div class="actionbar" id="actionbar" hidden></div>
+    <div class="toast" id="toast" role="status" aria-live="polite" hidden></div>
+    <div class="boom" id="boom" hidden><span>펑!</span></div>
+
+    <section class="overlay overlay-intro" id="intro" aria-labelledby="introTitle">
+      <div class="card card-intro">
+        <p class="eyebrow">긴급 출동</p>
+        <h2 id="introTitle">시한폭탄 처리반</h2>
+        <p class="lead">폭탄의 정지 회로가 고장 났어요. 고장 난 곳을 빨리 찾아 고쳐서 <b>정지 램프(전구)에 불이 켜지면</b> 폭탄이 멈춰요.</p>
+        <ul class="howto">
+          <li><b>집게</b> 색 있는 손잡이를 끌어 금속 부분에 물려요.</li>
+          <li><b>스위치</b> 누르면 닫혀요.</li>
+          <li><b>부품 상자</b> 새 전지, 새 전구, 금속 막대, 새 전선을 고장 난 부품 위로 끌어다 놓으면 바꿔 끼워져요. 하나씩만 있어요.</li>
+          <li><b>전지 끼우개·전선</b> 누르면 ‘전지 방향 바꾸기’, ‘전선 빼기’ 단추가 나와요.</li>
+        </ul>
+        <p class="warn">폭탄을 해체할수록 제한 시간이 짧아져요. 합선을 만들면 5초가 줄어요. 한 번 터지면 끝!</p>
+        <form class="start-form" id="startForm">
+          <label for="playerName">별명 또는 번호</label>
+          <div class="start-row">
+            <input id="playerName" name="playerName" maxlength="12" autocomplete="off" placeholder="예: 3번">
+            <button type="submit" class="btn btn-go">출동!</button>
+          </div>
+        </form>
+        <div class="records" id="introRecords"></div>
+      </div>
+    </section>
+
+    <section class="overlay overlay-cleared" id="cleared" hidden aria-labelledby="clearedTitle">
+      <div class="card card-cleared">
+        <p class="eyebrow eyebrow-safe">해체 성공</p>
+        <h2 id="clearedTitle">폭탄을 멈췄어요!</h2>
+        <p class="sub" id="clearedTime"></p>
+        <ul class="causes" id="clearedCauses"></ul>
+        <button type="button" class="btn btn-go" id="nextBtn">다음 폭탄 <span id="nextCount"></span></button>
+      </div>
+    </section>
+
+    <section class="overlay overlay-over" id="gameover" hidden aria-labelledby="overTitle">
+      <div class="card card-over">
+        <p class="eyebrow eyebrow-danger" id="overEyebrow">폭발</p>
+        <h2 id="overTitle">펑! 폭탄이 터졌어요</h2>
+        <p class="final"><span>해체한 폭탄</span><strong id="finalScore">0</strong><span>개</span></p>
+        <p class="badge" id="newBest" hidden>이 기기 최고 기록!</p>
+        <div id="overCauses"></div>
+        <div class="records" id="overRecords"></div>
+        <div class="over-actions">
+          <button type="button" class="btn btn-go" id="againBtn">다시 도전</button>
+          <button type="button" class="btn" id="homeBtn">처음 화면</button>
+        </div>
+      </div>
+    </section>
+  </main>
+</div>
+
+<script src="../js/circuit.js"></script>
+<script src="../js/parts.js"></script>
+<script src="bomb.js"></script>
+<script src="game.js"></script>
+</body>
+</html>
