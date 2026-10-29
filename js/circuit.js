@@ -97,6 +97,7 @@
    *   socket:  { bulbId }                   단자 a, b
    *   switch:  { closed }                   단자 a, b
    *   motor, magnet                         단자 a, b
+   *     magnet.sand: [왼쪽, 오른쪽] 에나멜선 끝을 벗긴 정도(0~1). 없으면 다 벗긴 것으로 본다
    *   buzzer                                단자 red, black
    *   rodPlastic, rodRubber, rodMetal       단자 a, b
    * wires: [{ id, ends: [{ attach: { partId, term } | null }, …] }]
@@ -150,6 +151,8 @@
       if (p.type === 'battery') {
         sources.push({ id: p.id, p: node(p.id, 'p'), n: node(p.id, 'n'), g: 1 / R_INTERNAL, emf: EMF });
       } else if (LOADS[p.type]) {
+        // 에나멜선 끝의 겉면(부도체)을 사포로 다 벗기지 않은 전자석에는 전기가 흐르지 않는다
+        if (p.type === 'magnet' && p.sand && !(p.sand[0] >= 1 && p.sand[1] >= 1)) return;
         var L = LOADS[p.type];
         conductors.push({ kind: p.type, id: p.id, a: node(p.id, L[0]), b: node(p.id, L[1]), g: 1 / L[2], oneWay: p.type === 'buzzer' });
       } else if ((p.type === 'switch' && p.closed) || p.type === 'rodMetal') {
@@ -242,6 +245,7 @@
     });
 
     parts.forEach(function (p) {
+      if (p.type === 'magnet' && !result.magnets[p.id]) result.magnets[p.id] = { current: 0 };
       if (p.type === 'switch' && !result.switches[p.id]) result.switches[p.id] = { current: 0 };
       if (/^rod/.test(p.type) && !result.rods[p.id]) result.rods[p.id] = { current: 0 };
     });

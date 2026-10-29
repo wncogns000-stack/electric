@@ -274,3 +274,20 @@ test('열린 스위치만 있는 회로는 합선이 아니고, 닫으면 합선
   parts[1].closed = true;
   assert.equal(solve(parts, wires).shorted, true);
 });
+
+test('에나멜선 양 끝을 다 벗긴 전자석에만 전기가 흐른다', () => {
+  const make = (sand) => {
+    const parts = [
+      { id: 'bat', type: 'battery', holderId: null, flipped: false },
+      { id: 'mag', type: 'magnet', turns: 100, sand }
+    ];
+    return solve(parts, [wire('bat', 'p', 'mag', 'a'), wire('mag', 'b', 'bat', 'n')]);
+  };
+  assert.equal(make([0, 0]).magnets.mag.current, 0);
+  assert.equal(make([1, 0.6]).magnets.mag.current, 0);
+  assert.ok(make([1, 1]).magnets.mag.current > 0.6);
+  // 겉면이 남아 전기가 흐르지 않을 뿐 합선은 아니다
+  assert.equal(make([1, 0]).shorted, false);
+  // 따로 적지 않은 전자석(이미 만든 전자석)은 벗긴 것으로 본다
+  assert.ok(make(undefined).magnets.mag.current > 0.6);
+});

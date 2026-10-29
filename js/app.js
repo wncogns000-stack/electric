@@ -121,9 +121,15 @@
     return null;
   }
   function partsOf(type) { return state.parts.filter(function (p) { return p.type === type; }); }
+  // 볼트로 만든 전자석은 볼트를 꺼낸 것으로 센다
   function onTableCount(type) {
-    return type === 'wire' ? state.wires.length : partsOf(type).length;
+    if (type === 'wire') return state.wires.length;
+    if (type === 'bolt') return state.parts.filter(function (p) { return p.fromBolt; }).length;
+    if (type === 'magnet') return state.parts.filter(function (p) { return p.type === 'magnet' && !p.fromBolt; }).length;
+    return partsOf(type).length;
   }
+  // 에나멜선 양 끝을 사포로 다 벗겼는지 (따로 만들지 않은 전자석은 벗긴 것으로 본다)
+  function sanded(p) { return !p.sand || (p.sand[0] >= 1 && p.sand[1] >= 1); }
 
   // 돌린 부품이 차지하는 가로·세로 반폭
   function extents(p) {
@@ -292,6 +298,11 @@
     return b && b.on ? clamp(b.voltage / 3, 0.2, 1.3) : 0;
   }
 
+  // 에나멜선을 많이 감을수록 전자석이 세진다. 100번 감은 전자석을 1로 보고, 50번이면 절반, 200번이면 두 배
+  function coilFactor(m) {
+    return clamp((m.turns === undefined ? 100 : m.turns) / 100, 0.5, 2);
+  }
+
   // 전자석, 둥근 철 고리, 나침반
   function computeFx() {
     var out = { attached: [], ringsLeft: {}, needles: {}, strong: {}, magnets: [] };
@@ -302,6 +313,7 @@
     partsOf('magnet').forEach(function (m) {
       var I = result.magnets[m.id] ? result.magnets[m.id].current : 0;
       var on = Math.abs(I) > 0.05;
+      var strength = I * coilFactor(m);
       var ends = P.MAGNET_ENDS.map(function (e) {
         var q = rotate(e.x, e.y, m.rot);
         return { x: m.x + q.x, y: m.y + q.y };
@@ -317,14 +329,14 @@
         if (!pile) return;
         info.nearRings = true;
         if (!on) return;
-        var n = Math.min(Math.min(8, Math.round(Math.abs(I) * 4.4)), out.ringsLeft[pile.id]);
+        var n = Math.min(Math.min(8, Math.round(Math.abs(strength) * 4.4)), out.ringsLeft[pile.id]);
         out.ringsLeft[pile.id] -= n;
         out.attached.push({ pos: e, dir: dirs[k], count: n });
       });
       if (on) {
         // 전류가 a → b로 흐르면 [1] 쪽 끝이 N극
-        poles.push({ pos: ends[1], q: I });
-        poles.push({ pos: ends[0], q: -I });
+        poles.push({ pos: ends[1], q: strength });
+        poles.push({ pos: ends[0], q: -strength });
       }
       info.ends = ends;
       out.magnets.push(info);
@@ -346,6 +358,9 @@
 
   // lessons.js의 활동이 쓰는 도우미
   var ctx = {
+    madeMagnet: function () {
+      return partsOf('magnet').some(function (p) { return p.fromBolt && sanded(p); });
+    },
     litWithSwitch: function () {
       return litBulbs(result).length > 0 && partsOf('switch').some(function (s) {
         return s.closed && result.switches[s.id].current > 0.02;
@@ -381,7 +396,8 @@
       fx.magnets.forEach(function (m) {
         if (!m.nearRings) return;
         var w = wiredTerms(m.part.id);
-        if (!m.on && w.a && w.b) seen.push('off');
+        // 겉면을 벗기지 않아 전기가 흐를 수 없는 전자석은 ‘스위치를 닫기 전’으로 치지 않는다
+        if (!m.on && w.a && w.b && sanded(m.part)) seen.push('off');
         if (m.on && m.level) seen.push(m.level);
       });
       return seen;
@@ -444,16 +460,50 @@
       if (type === 'bulb') p.socketId = null;
       if (type === 'socket') p.bulbId = null;
       if (type === 'switch') p.closed = false;
+      if (type === 'bolt') { p.fromBolt = true; p.paper = false; p.tape = false; p.turns = 0; p.cut = false; p.sand = [0, 0]; }
       state.parts.push(p);
       keepOnTable(p);
       state.selected = { kind: 'part', id: p.id };
       state.actionsOpen = false;
     }
-    if (!hintsShown[type]) {
+    if (FIRST_HINTS[type] && !hintsShown[type]) {
       hintsShown[type] = true;
       toast(FIRST_HINTS[type]);
     }
     update();
+    // 볼트를 꺼내면 바로 작업대에서 전자석을 만든다
+    if (type === 'bolt') openBench(p);
+  }
+
+  /* ---------- 전자석 만들기 작업대 ---------- */
+
+  function openBench(p) {
+    state.selected = { kind: 'part', id: p.id };
+    state.actionsOpen = false;
+    hideToast();
+    update();
+    window.LabBench.open(p, { onChange: update, onClose: finishBench });
+  }
+
+  // 작업대를 닫으면 다 감고 자른 볼트는 전자석이 되고, 다시 감으려고 푼 전자석은 볼트로 돌아간다
+  function finishBench(p) {
+    if (findPart(p.id) !== p) return;
+    var ready = window.LabBench.ready(p);
+    if (ready && p.type === 'bolt') {
+      p.type = 'magnet';
+      keepOnTable(p);
+      toast('전자석을 테이블에 놓았어요. 양쪽 에나멜선 끝에 집게를 물려 보세요.');
+    } else if (!ready && p.type === 'magnet') {
+      detachAt(p.id);
+      p.type = 'bolt';
+      keepOnTable(p);
+      toast('에나멜선을 다시 감아야 해요. 볼트를 누르고 ‘전자석 만들기’를 눌러요.');
+    } else if (!ready) {
+      toast('볼트를 누르고 ‘전자석 만들기’를 누르면 이어서 만들 수 있어요.');
+    }
+    update();
+    var el = svg.querySelector('[data-key="part:' + p.id + '"]');
+    if (el) el.focus({ preventScroll: true });
   }
 
   function bringToTop(group) {
@@ -893,6 +943,8 @@
       var p = findPart(sel.id);
       if (!p) return [];
       var list = [];
+      if (p.type === 'bolt') list.push(['bench', '전자석 만들기']);
+      if (p.type === 'magnet' && p.fromBolt) list.push(['bench', '작업대 열기']);
       if (p.type === 'switch') list.push(['toggle', p.closed ? '스위치 열기' : '스위치 닫기']);
       if (p.type !== 'rings' && p.type !== 'compass') list.push(['rotate', '돌리기']);
       if (p.type === 'holder' && p.batteryId) {
@@ -930,6 +982,7 @@
       }
       if (act === 'eject') eject(p);
       if (act === 'unjoin') unjoin(p);
+      if (act === 'bench' && p.fromBolt) { openBench(p); return; }
       if (act === 'remove') { removePart(p); state.selected = null; }
     } else if (sel.kind === 'wire') {
       var w = findWire(sel.id);
@@ -969,7 +1022,11 @@
     if (p.type === 'switch') return name + ', ' + (p.closed ? '닫힘' : '열림');
     if (p.type === 'motor') return name + ', ' + (Math.abs(motorSpeed(p.id)) > 0.05 ? '도는 중' : '멈춤');
     if (p.type === 'buzzer') return name + ', ' + (result.buzzers[p.id].on ? '울리는 중' : '조용함');
-    if (p.type === 'magnet') return name + ', ' + (Math.abs(result.magnets[p.id].current) > 0.05 ? '전기가 흐름' : '전기가 흐르지 않음');
+    if (p.type === 'magnet') {
+      if (!sanded(p)) return name + ', 에나멜선 끝의 겉면을 다 벗기지 않음';
+      return name + ', ' + (Math.abs(result.magnets[p.id].current) > 0.05 ? '전기가 흐름' : '전기가 흐르지 않음');
+    }
+    if (p.type === 'bolt') return name + ', ' + (p.turns > 0 ? '에나멜선 ' + Math.floor(p.turns) + '번 감음' : p.paper ? '종이를 감음' : '아무것도 감지 않음');
     return name;
   }
 
@@ -1003,6 +1060,10 @@
         opts.fast = Math.abs(motorSpeed(p.id)) > 1.6;
       }
       if (p.type === 'buzzer') opts.loudness = buzzerLoudness(p.id);
+      if (p.fromBolt) {
+        opts.paper = p.paper; opts.tape = p.tape; opts.turns = p.turns; opts.cut = p.cut;
+        opts.sand = p.sand;
+      }
       if (p.type === 'rings') opts.count = fx.ringsLeft[p.id];
       if (p.type === 'compass') opts.needle = (fx.needles[p.id] === undefined ? -90 : fx.needles[p.id]) - p.rot;
 
@@ -1133,6 +1194,12 @@
     var reversedBuzzer = partsOf('buzzer').some(function (p) { return result.buzzers[p.id].voltage < -0.5; });
     var magnets = partsOf('magnet').filter(function (p) { return Math.abs(result.magnets[p.id].current) > 0.05; });
     var loads = state.parts.filter(function (p) { return LOADS.indexOf(p.type) >= 0; });
+    // 겉면만 벗기면 전기가 흐를 전자석
+    var unsanded = partsOf('magnet').filter(function (p) {
+      if (sanded(p)) return false;
+      var r = C.solve(state.parts.map(function (q) { return q === p ? Object.assign({}, q, { sand: null }) : q; }), state.wires);
+      return Math.abs(r.magnets[p.id].current) > 0.05;
+    });
     var pieces = [];
     if (lit.length) pieces.push(lit.length === bulbs.length ? '전구 ' + lit.length + '개에 불이 켜졌어요' : '전구 ' + bulbs.length + '개 중 ' + lit.length + '개에 불이 켜졌어요');
     if (spinning.length) pieces.push('전동기가 돌아요');
@@ -1147,11 +1214,16 @@
     } else if (pieces.length) {
       tone = 'lit';
       text = pieces.join(' · ') + '.';
+    } else if (unsanded.length) {
+      text = '전자석에 전기가 흐르지 않아요. 에나멜선 끝의 겉면을 사포로 다 벗겼는지 확인해 보세요.';
     } else if (reversedBuzzer) {
       text = '버저가 울리지 않아요. 버저의 빨간색·검은색 전선이 어느 극 쪽에 이어졌는지 확인해 보세요.';
+    } else if (!loads.length && partsOf('bolt').length) {
+      text = '볼트를 누르고 ‘전자석 만들기’를 눌러 전자석을 마저 만들어 보세요.';
     } else if (!loads.length) {
       var names = lesson().tools.filter(function (t) { return LOADS.indexOf(t) >= 0; }).map(function (t) { return TYPES[t].name; });
-      text = names.length > 1 ? names.join(', ') + ' 중 하나를 테이블에 올려 보세요.' : objectParticle(names[0]) + ' 테이블에 올려 보세요.';
+      if (!names.length) text = '둥근 머리 볼트를 테이블에 올려 전자석을 만들어 보세요.';
+      else text = names.length > 1 ? names.join(', ') + ' 중 하나를 테이블에 올려 보세요.' : objectParticle(names[0]) + ' 테이블에 올려 보세요.';
     } else {
       text = '아직 전기가 흐르지 않아요. 전지의 (+)극부터 (−)극까지 끊어진 곳은 없는지 살펴보세요.';
     }

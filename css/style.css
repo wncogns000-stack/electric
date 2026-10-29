@@ -703,6 +703,117 @@ button { font: inherit; color: inherit; }
 .help-safety b { color: var(--danger); margin-right: 4px; }
 .help .btn { align-self: flex-end; }
 
+/* ---------- 전자석 만들기 작업대 ---------- */
+.workbench {
+  width: min(880px, calc(100% - 24px));
+  max-height: calc(100% - 24px);
+  padding: 0;
+  border: 1px solid var(--line);
+  border-radius: 16px;
+  background: var(--surface);
+  color: var(--ink);
+  box-shadow: var(--shadow);
+}
+.workbench::backdrop { background: rgba(10, 16, 13, 0.55); }
+.workbench-inner { display: flex; flex-direction: column; gap: 12px; padding: 18px; }
+.workbench-top { display: flex; align-items: flex-start; justify-content: space-between; gap: 12px; }
+.workbench-top .btn { flex: none; }
+.workbench h2 { margin: 0; font-family: var(--font-display); font-weight: 400; font-size: var(--step-2); }
+.workbench-note { margin: 2px 0 0; color: var(--muted); font-size: var(--step--1); }
+
+.bench-steps {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 8px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+.bench-step {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  padding: 10px 12px;
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  background: var(--surface-2);
+  color: var(--muted);
+  font-size: var(--step--1);
+  font-variant-numeric: tabular-nums;
+}
+.bench-step-text { display: flex; flex-direction: column; min-width: 0; }
+.bench-step b { color: var(--ink); font-size: var(--step-0); font-weight: 600; }
+.bench-step strong { color: var(--ink); font-weight: 600; }
+.bench-step.is-current { border-color: var(--accent); background: var(--accent-soft); color: var(--ink); }
+.bench-num {
+  flex: none;
+  display: grid;
+  place-items: center;
+  width: 26px;
+  height: 26px;
+  border-radius: 50%;
+  background: var(--line);
+  color: var(--ink);
+  font-weight: 600;
+}
+.bench-step.is-current .bench-num { background: var(--accent); color: var(--accent-ink); }
+.bench-step.is-done .bench-num { background: var(--ok); color: var(--surface); }
+
+.workbench-stage {
+  border-radius: 14px;
+  overflow: hidden;
+  background: var(--mat);
+  box-shadow: inset 0 0 0 1px rgba(0, 0, 0, 0.12);
+}
+.workbench-svg {
+  display: block;
+  width: 100%;
+  height: auto;
+  touch-action: none;
+  user-select: none;
+  -webkit-user-select: none;
+  font-family: var(--font-body);
+}
+.bench-mat { fill: var(--mat); }
+.bench-label { font-size: 15px; font-weight: 600; fill: var(--mat-ink); text-anchor: middle; pointer-events: none; }
+.bench-label-dark { fill: #4a3315; }
+.bench-tip-label { font-size: 14px; font-weight: 600; fill: var(--mat-ink); text-anchor: middle; pointer-events: none; }
+.bench-count { font-size: 22px; font-weight: 600; fill: var(--mat-ink); text-anchor: middle; pointer-events: none; font-variant-numeric: tabular-nums; }
+.bench-target {
+  fill: none;
+  stroke: var(--ring);
+  stroke-width: 3;
+  stroke-dasharray: 8 8;
+  pointer-events: none;
+  animation: armed 1.2s linear infinite;
+}
+
+.dial-hit { fill: transparent; }
+.dial.is-active { cursor: grab; }
+.dragging-bench .dial.is-active { cursor: grabbing; }
+.dial-ring { fill: none; stroke: var(--mat-line-major); stroke-width: 2; stroke-dasharray: 4 6; }
+.dial.is-active .dial-ring { stroke: var(--ring); stroke-opacity: 0.8; }
+.dial-arrow { fill: none; stroke: var(--ring); stroke-width: 4; stroke-linecap: round; }
+.dial-arrow-head { fill: var(--ring); }
+.dial-arm { stroke: #c9ced3; stroke-width: 7; stroke-linecap: round; }
+.dial-knob { fill: #e2b21c; stroke: #8a6a10; stroke-width: 2; }
+.dial:not(.is-active) .dial-arm,
+.dial:not(.is-active) .dial-knob { opacity: 0.5; }
+
+.sandpaper { cursor: grab; }
+.sandpaper.is-off { opacity: 0.45; cursor: default; }
+
+.bench-tip {
+  margin: 0;
+  padding: 10px 14px;
+  border-radius: 10px;
+  background: var(--surface-2);
+  min-height: 3.3em;
+}
+.workbench-foot { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 8px; }
+.bench-controls { display: flex; flex-wrap: wrap; gap: 8px; }
+.workbench .btn:disabled { opacity: 0.5; cursor: not-allowed; }
+
 /* ---------- 좁은 화면 ---------- */
 @media (max-width: 1180px) {
   .app {
@@ -743,9 +854,12 @@ button { font: inherit; color: inherit; }
   .tool { width: 168px; }
   .stage { height: min(68vh, 560px); min-height: 360px; }
   .mission-list { grid-template-columns: minmax(0, 1fr); }
+  .workbench-inner { padding: 14px; }
+  .bench-steps { grid-template-columns: minmax(0, 1fr); gap: 6px; }
+  .bench-step { padding: 8px 10px; }
 }
 
 @media (prefers-reduced-motion: reduce) {
-  .flow, .heat, .wire-hot, .term-ring.is-armed, .mission.just-done, .wave { animation: none; }
+  .flow, .heat, .wire-hot, .term-ring.is-armed, .mission.just-done, .wave, .bench-target { animation: none; }
   .flow { stroke-dasharray: 2 10; }
 }

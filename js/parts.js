@@ -95,6 +95,14 @@
         b: { x: 46, y: 31, out: 90, label: '전자석의 오른쪽 에나멜선 끝' }
       }
     },
+    // 아직 전자석이 되지 않은 볼트. 작업대에서 에나멜선을 감으면 magnet이 된다
+    bolt: {
+      name: '둥근 머리 볼트',
+      max: 1,
+      radius: 84,
+      box: { x: -86, y: -20, w: 164, h: 40 },
+      terms: {}
+    },
     rings: {
       name: '둥근 철 고리',
       max: 1,
@@ -359,16 +367,72 @@
     ].join('');
   }
 
-  function magnet() {
-    return [
-      '<path d="M-50 9C-54 18 -48 22 -46 26" stroke="#b8692e" stroke-width="2" fill="none"/>',
-      '<path d="M50 9C54 18 48 22 46 26" stroke="#b8692e" stroke-width="2" fill="none"/>',
-      '<path d="M-46 25V33M46 25V33" stroke="#d9dde1" stroke-width="2.4" stroke-linecap="round"/>',
+  // 전자석과 볼트가 함께 쓰는 그림: 볼트, 종이, 셀로판테이프, 감은 에나멜선
+  // turns: 감은 횟수 (100번에 한 겹), 한 겹이 넘으면 오른쪽에서 왼쪽으로 두 번째 겹을 감는다
+  var COIL_LAYER = 100;
+  function coilFront(turns) {
+    if (turns <= COIL_LAYER) return -56 + 110 * turns / COIL_LAYER;
+    return 54 - 110 * Math.min(1, (turns - COIL_LAYER) / COIL_LAYER);
+  }
+  function boltBody(opts) {
+    var turns = opts.turns || 0;
+    var out = [
       '<rect x="-70" y="-5" width="140" height="10" rx="2" fill="url(#gMetal)"/>',
       '<path d="M58 -5V5M61.5 -5V5M65 -5V5" stroke="#868c92" stroke-width="1"/>',
-      '<path d="M-70 -13H-76A6 13 0 0 0 -76 13H-70Z" fill="url(#gMetal)" stroke="#868c92" stroke-width=".8"/>',
-      '<rect x="-56" y="-11" width="110" height="22" rx="4" fill="url(#coil)"/>',
-      '<rect x="-56" y="-11" width="110" height="7" rx="3" fill="#ffffff" opacity=".18"/>'
+      '<path d="M-70 -13H-76A6 13 0 0 0 -76 13H-70Z" fill="url(#gMetal)" stroke="#868c92" stroke-width=".8"/>'
+    ];
+    if (opts.paper) out.push('<rect x="-58" y="-8" width="114" height="16" rx="2" fill="#f4f1e8" stroke="#d3cbb8" stroke-width=".8"/>');
+    if (opts.tape) {
+      out.push('<rect x="-60" y="-10" width="9" height="20" rx="1.5" fill="#cfe6ff" opacity=".7"/>');
+      out.push('<rect x="49" y="-10" width="9" height="20" rx="1.5" fill="#cfe6ff" opacity=".7"/>');
+    }
+    if (turns > 0) {
+      var len1 = 110 * Math.min(1, Math.max(0.06, turns / COIL_LAYER));
+      out.push('<rect x="-56" y="-11" width="' + len1.toFixed(1) + '" height="22" rx="4" fill="url(#coil)"/>');
+      out.push('<rect x="-56" y="-11" width="' + len1.toFixed(1) + '" height="7" rx="3" fill="#ffffff" opacity=".18"/>');
+      if (turns > COIL_LAYER) {
+        var len2 = 110 * Math.min(1, (turns - COIL_LAYER) / COIL_LAYER);
+        out.push('<rect x="' + (54 - len2).toFixed(1) + '" y="-13" width="' + len2.toFixed(1) + '" height="26" rx="5" fill="url(#coil)"/>');
+        out.push('<rect x="' + (54 - len2).toFixed(1) + '" y="-13" width="' + len2.toFixed(1) + '" height="26" rx="5" fill="#5a2a0c" opacity=".2"/>');
+      }
+    }
+    return out.join('');
+  }
+
+  // 에나멜선 끝: 겉면이 남아 있으면 검붉고, 사포로 벗기면 구리색으로 반짝인다 (amount 0~1)
+  function leadTip(x, amount) {
+    var a = Math.max(0, Math.min(1, amount));
+    var mix = function (c0, c1) { return Math.round(c0 + (c1 - c0) * a); };
+    var color = 'rgb(' + mix(110, 242) + ',' + mix(44, 178) + ',' + mix(16, 120) + ')';
+    return '<path d="M' + x + ' 25V33" stroke="' + color + '" stroke-width="2.6" stroke-linecap="round"/>' +
+      (a >= 1 ? '<circle cx="' + (x + 2) + '" cy="27" r="1.2" fill="#ffffff" opacity=".9"/>' : '');
+  }
+
+  // 작업대에서 만들고 있는 볼트. 자르기 전에는 감던 에나멜선 끝이 볼트 위로 늘어져 있다
+  function bolt(opts) {
+    opts = opts || {};
+    if (opts.cut) return magnet(opts);
+    var out = boltBody(opts);
+    if (opts.turns > 0) {
+      var front = coilFront(opts.turns);
+      out += '<path d="M' + front.toFixed(1) + ' -11C' + (front + 3).toFixed(1) + ' -20 ' + (front + 12).toFixed(1) + ' -22 ' + (front + 20).toFixed(1) + ' -19"' +
+        ' stroke="#b8692e" stroke-width="2" fill="none" stroke-linecap="round"/>';
+    }
+    return out;
+  }
+
+  // 준비된 전자석은 100번 감고 양 끝을 벗긴 것으로 그린다
+  function magnet(opts) {
+    opts = opts || {};
+    var turns = opts.turns === undefined ? 100 : opts.turns;
+    var sand = opts.sand || [1, 1];
+    var front = coilFront(turns);
+    return [
+      boltBody({ turns: turns, paper: opts.paper, tape: opts.tape }),
+      '<path d="M-53 9C-56 18 -48 22 -46 26" stroke="#8a3a14" stroke-width="2" fill="none"/>',
+      '<path d="M' + front.toFixed(1) + ' 10C' + (front + 2).toFixed(1) + ' 20 48 20 46 26" stroke="#8a3a14" stroke-width="2" fill="none"/>',
+      leadTip(-46, sand[0]),
+      leadTip(46, sand[1])
     ].join('');
   }
 
@@ -421,7 +485,7 @@
     rodPlastic: function () { return rod('rodPlastic'); },
     rodRubber: function () { return rod('rodRubber'); },
     rodMetal: function () { return rod('rodMetal'); },
-    motor: motor, buzzer: buzzer, magnet: magnet, rings: rings, compass: compass
+    motor: motor, buzzer: buzzer, magnet: magnet, bolt: bolt, rings: rings, compass: compass
   };
 
   function draw(type, opts) {
@@ -448,6 +512,7 @@
       motor: '-62 -42 124 84',
       buzzer: '-56 -34 112 64',
       magnet: '-86 -30 164 70',
+      bolt: '-86 -30 164 60',
       rings: '-44 -34 88 68',
       compass: '-38 -38 76 76'
     }[type];
@@ -462,6 +527,7 @@
     GLOBE: GLOBE,
     JOIN_GAP: JOIN_GAP,
     MAGNET_ENDS: MAGNET_ENDS,
+    COIL_LAYER: COIL_LAYER,
     RING_TOTAL: RING_SPOTS.length,
     ring: ring,
     CLIP_LENGTH: CLIP_LENGTH,

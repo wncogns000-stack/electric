@@ -10,6 +10,7 @@
  *     ctx.litWithSwitch()        스위치를 닫아 전구에 불이 켜졌는지
  *     ctx.testedRods()           불이 켜지는 회로에 이어 본 막대 종류 목록
  *     ctx.levels(kind)           전구·전동기·버저가 전지 한 개('one')/두 개('two')로 동작한 목록
+ *     ctx.madeMagnet()           둥근 머리 볼트로 전자석을 다 만들었는지 (에나멜선 양 끝까지 벗김)
  *     ctx.magnetRings()          둥근 철 고리 옆에서 전자석이 꺼져 있음('off')/전지 한 개·두 개로 켜짐('one', 'two')
  *     ctx.compassSides(memo)     전자석 옆 나침반으로 관찰한 전류 방향 ('fwd', 'rev')
  */
@@ -91,20 +92,23 @@
       tab: '3. 전자석',
       title: '전자석의 성질이 궁금해!',
       pages: '64~66쪽',
-      tools: ['battery', 'holder', 'switch', 'wire', 'magnet', 'rings', 'compass'],
+      tools: ['battery', 'holder', 'switch', 'wire', 'bolt', 'rings', 'compass'],
       missions: [
         {
           id: 'l3-make',
           title: '실험 1 전자석 만들기',
-          body: '전자석을 전기 회로에 연결하고, 전자석 끝부분을 둥근 철 고리에 가까이 한 채 스위치를 닫기 전과 닫은 뒤를 비교해 보세요.',
+          body: '둥근 머리 볼트와 에나멜선으로 전자석을 만들어 전기 회로에 연결하고, 전자석 끝부분을 둥근 철 고리에 가까이 한 채 스위치를 닫기 전과 닫은 뒤를 비교해 보세요.',
+          tip: '실험 도구에서 둥근 머리 볼트를 누르면 전자석을 만드는 작업대가 열려요.',
           think: '스위치를 다시 열면 둥근 철 고리는 어떻게 되나요?',
           steps: [
+            { id: 'made', label: '전자석 만들기' },
             { id: 'off', label: '스위치를 닫기 전' },
             { id: 'on', label: '스위치를 닫은 뒤' }
           ],
           observe: function (ctx) {
             var seen = ctx.magnetRings();
             var out = [];
+            if (ctx.madeMagnet()) out.push('made');
             if (seen.indexOf('off') >= 0) out.push('off');
             if (seen.indexOf('one') >= 0 || seen.indexOf('two') >= 0) out.push('on');
             return out;
@@ -141,7 +145,7 @@
       pages: '',
       note: '모든 실험 도구를 꺼내 쓸 수 있어요. 궁금한 전기 회로를 직접 만들어 보세요.',
       tools: ['battery', 'holder', 'bulb', 'socket', 'switch', 'wire', 'motor', 'buzzer',
-        'rodPlastic', 'rodRubber', 'rodMetal', 'magnet', 'rings', 'compass'],
+        'rodPlastic', 'rodRubber', 'rodMetal', 'magnet', 'bolt', 'rings', 'compass'],
       missions: []
     }
   ];

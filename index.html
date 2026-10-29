@@ -88,6 +88,7 @@
       <li><b>전지 끼우개 붙이기</b> 전지 끼우개를 다른 전지 끼우개의 끝에 끌어다 대면 서로 붙어요. 떼려면 끼우개를 누르고 ‘끼우개 떼기’를 눌러요.</li>
       <li><b>전선 잇기</b> 집게 달린 전선의 집게(색 있는 손잡이)를 끌어서 금속 부분에 물려요. 금속 부분 두 곳을 차례로 눌러도 테이블에 있는 전선으로 이어져요.</li>
       <li><b>스위치</b> 스위치를 누르면 닫히고, 한 번 더 누르면 열려요.</li>
+      <li><b>전자석 만들기</b> 둥근 머리 볼트를 테이블에 올리면 작업대가 열려요. 종이를 감아 셀로판테이프로 붙이고, 볼트 머리의 손잡이를 돌려 에나멜선을 감은 뒤 잘라요. 사포로 에나멜선 양 끝을 문질러 벗기면 전자석이 돼요.</li>
       <li><b>전자석</b> 전자석의 끝부분을 둥근 철 고리나 나침반 가까이 가져가 보세요.</li>
     </ol>
     <p class="help-safety"><b>안전</b> 실제 실험에서 전구 없이 전지의 (+)극과 (−)극을 전선으로 바로 이으면 전지와 전선이 뜨거워져 위험해요. 이 실험실에서는 그렇게 이으면 경고가 나타나요.</p>
@@ -95,9 +96,34 @@
   </div>
 </dialog>
 
+<dialog class="workbench" id="benchDialog" aria-labelledby="benchTitle">
+  <div class="workbench-inner">
+    <div class="workbench-top">
+      <div>
+        <h2 id="benchTitle">전자석 만들기</h2>
+        <p class="workbench-note">교과서 64쪽 · 둥근 머리 볼트, 에나멜선, 종이, 셀로판테이프, 사포</p>
+      </div>
+      <button type="button" class="btn btn-quiet" id="benchClose">닫기</button>
+    </div>
+    <ol class="bench-steps" id="benchSteps"></ol>
+    <div class="workbench-stage">
+      <svg id="benchSvg" class="workbench-svg" viewBox="0 0 800 360" role="img" aria-label="전자석 작업대. 볼트 머리의 손잡이를 돌려 에나멜선을 감고, 사포를 끌어 에나멜선 끝을 문지릅니다.">
+        <defs id="benchDefs"></defs>
+        <g id="benchScene"></g>
+      </svg>
+    </div>
+    <p class="bench-tip" id="benchTip" role="status" aria-live="polite"></p>
+    <div class="workbench-foot">
+      <div class="bench-controls" id="benchControls"></div>
+      <button type="button" class="btn btn-primary" id="benchPlace" disabled>테이블에 놓기</button>
+    </div>
+  </div>
+</dialog>
+
 <script src="js/circuit.js"></script>
 <script src="js/parts.js"></script>
 <script src="js/lessons.js"></script>
+<script src="js/bench.js"></script>
 <script src="js/app.js"></script>
 </body>
 </html>
