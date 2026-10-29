@@ -399,7 +399,7 @@
     return out.join('');
   }
 
-  // 에나멜선 끝: 겉면이 남아 있으면 검붉고, 사포로 벗기면 구리색으로 반짝인다 (amount 0~1)
+  // 에나멜선 끝: 코팅이 남아 있으면 검붉고, 사포로 벗기면 구리색으로 반짝인다 (amount 0~1)
   function leadTip(x, amount) {
     var a = Math.max(0, Math.min(1, amount));
     var mix = function (c0, c1) { return Math.round(c0 + (c1 - c0) * a); };

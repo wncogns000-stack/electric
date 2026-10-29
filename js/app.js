@@ -128,7 +128,7 @@
     if (type === 'magnet') return state.parts.filter(function (p) { return p.type === 'magnet' && !p.fromBolt; }).length;
     return partsOf(type).length;
   }
-  // 에나멜선 양 끝을 사포로 다 벗겼는지 (따로 만들지 않은 전자석은 벗긴 것으로 본다)
+  // 에나멜선 양쪽 끝부분의 코팅을 사포로 다 벗겼는지 (따로 만들지 않은 전자석은 벗긴 것으로 본다)
   function sanded(p) { return !p.sand || (p.sand[0] >= 1 && p.sand[1] >= 1); }
 
   // 돌린 부품이 차지하는 가로·세로 반폭
@@ -396,7 +396,7 @@
       fx.magnets.forEach(function (m) {
         if (!m.nearRings) return;
         var w = wiredTerms(m.part.id);
-        // 겉면을 벗기지 않아 전기가 흐를 수 없는 전자석은 ‘스위치를 닫기 전’으로 치지 않는다
+        // 코팅을 벗기지 않아 전기가 흐를 수 없는 전자석은 ‘스위치를 닫기 전’으로 치지 않는다
         if (!m.on && w.a && w.b && sanded(m.part)) seen.push('off');
         if (m.on && m.level) seen.push(m.level);
       });
@@ -1023,7 +1023,7 @@
     if (p.type === 'motor') return name + ', ' + (Math.abs(motorSpeed(p.id)) > 0.05 ? '도는 중' : '멈춤');
     if (p.type === 'buzzer') return name + ', ' + (result.buzzers[p.id].on ? '울리는 중' : '조용함');
     if (p.type === 'magnet') {
-      if (!sanded(p)) return name + ', 에나멜선 끝의 겉면을 다 벗기지 않음';
+      if (!sanded(p)) return name + ', 에나멜선 끝의 코팅을 다 벗기지 않음';
       return name + ', ' + (Math.abs(result.magnets[p.id].current) > 0.05 ? '전기가 흐름' : '전기가 흐르지 않음');
     }
     if (p.type === 'bolt') return name + ', ' + (p.turns > 0 ? '에나멜선 ' + Math.floor(p.turns) + '번 감음' : p.paper ? '종이를 감음' : '아무것도 감지 않음');
@@ -1194,7 +1194,7 @@
     var reversedBuzzer = partsOf('buzzer').some(function (p) { return result.buzzers[p.id].voltage < -0.5; });
     var magnets = partsOf('magnet').filter(function (p) { return Math.abs(result.magnets[p.id].current) > 0.05; });
     var loads = state.parts.filter(function (p) { return LOADS.indexOf(p.type) >= 0; });
-    // 겉면만 벗기면 전기가 흐를 전자석
+    // 코팅만 벗기면 전기가 흐를 전자석
     var unsanded = partsOf('magnet').filter(function (p) {
       if (sanded(p)) return false;
       var r = C.solve(state.parts.map(function (q) { return q === p ? Object.assign({}, q, { sand: null }) : q; }), state.wires);
@@ -1215,7 +1215,7 @@
       tone = 'lit';
       text = pieces.join(' · ') + '.';
     } else if (unsanded.length) {
-      text = '전자석에 전기가 흐르지 않아요. 에나멜선 끝의 겉면을 사포로 다 벗겼는지 확인해 보세요.';
+      text = '전자석에 전기가 흐르지 않아요. 에나멜선 끝의 코팅된 부분을 사포로 다 벗겼는지 확인해 보세요.';
     } else if (reversedBuzzer) {
       text = '버저가 울리지 않아요. 버저의 빨간색·검은색 전선이 어느 극 쪽에 이어졌는지 확인해 보세요.';
     } else if (!loads.length && partsOf('bolt').length) {

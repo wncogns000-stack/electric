@@ -1,11 +1,10 @@
 /*
  * 전자석 만들기 작업대
  *
- * 교과서 64쪽 준비물(둥근 머리 볼트, 에나멜선, 종이, 셀로판테이프, 사포)로 전자석을 만든다.
- *  1) 볼트에 종이를 감고 셀로판테이프로 붙인다
- *  2) 볼트 머리의 손잡이를 돌려 에나멜선을 감고, 다 감으면 자른다
- *  3) 에나멜선 양 끝을 사포로 문질러 겉면(부도체)을 벗긴다
- * 교과서에는 만드는 순서가 나오지 않아(『실험관찰』 40쪽에 있음) 준비물로 미루어 이 순서로 정했다.
+ * 『실험관찰』 40쪽 순서대로 둥근 머리 볼트, 에나멜선, 종이, 셀로판테이프, 사포로 전자석을 만든다.
+ *  1) 둥근 머리 볼트에 종이를 감고, 셀로판테이프로 고정한다
+ *  2) 볼트 머리의 손잡이를 돌려 종이 위에 에나멜선을 한쪽 방향으로 100번 정도 감고, 끝부분을 5 cm 정도 남겨 자른다
+ *  3) 에나멜선의 양쪽 끝부분을 사포로 문질러 코팅된 부분(전기가 잘 흐르지 않는 물질)을 벗긴다
  * 작업 상태는 볼트 부품에 그대로 적는다: paper, tape, turns, cut, sand[왼쪽 끝, 오른쪽 끝]
  * 작업대를 닫으면 app.js가 볼트를 전자석으로 바꾼다.
  */
@@ -16,7 +15,7 @@
   var GOOD_TURNS = 100;
   var MAX_TURNS = 200;     // 볼트에 두 겹까지 감을 수 있다
   var TURNS_PER_REV = 10;  // 손잡이를 한 바퀴 돌리면 감기는 횟수 (실제보다 많이 감긴다)
-  var SAND_WORK = 420;     // 사포를 이만큼(작업대 좌표) 문지르면 겉면이 다 벗겨진다
+  var SAND_WORK = 420;     // 사포를 이만큼(작업대 좌표) 문지르면 코팅이 다 벗겨진다
   var LAYER = 100;         // 한 겹에 감기는 횟수 (parts.js와 같다)
 
   // 작업대 그림 좌표 (viewBox 800 × 360)
@@ -78,7 +77,7 @@
   }
 
   function tipLabel(tip, amount) {
-    var text = amount >= 1 ? '벗김' : amount > 0 ? Math.round(amount * 100) + '%' : '겉면 그대로';
+    var text = amount >= 1 ? '벗김' : amount > 0 ? Math.round(amount * 100) + '%' : '코팅 그대로';
     return '<text class="bench-tip-label" x="' + fmt(tip.x) + '" y="' + (tip.y + 24) + '">' + text + '</text>';
   }
 
@@ -170,9 +169,9 @@
   function renderSteps() {
     var st = stage();
     var items = [
-      { n: 1, title: '종이 감기', text: part.tape ? '종이를 감고 셀로판테이프로 붙였어요.' : '볼트에 종이를 감고 셀로판테이프로 붙여요.' },
-      { n: 2, title: '에나멜선 감기', text: '감은 횟수 <strong>' + Math.floor(part.turns) + '</strong>번' + (st <= 2 && part.turns < GOOD_TURNS ? ' · ' + GOOD_TURNS + '번 이상 감아 보세요' : '') },
-      { n: 3, title: '양 끝 벗기기', text: '왼쪽 끝 ' + pct(part.sand[0]) + ' · 오른쪽 끝 ' + pct(part.sand[1]) }
+      { n: 1, title: '종이 감기', text: part.tape ? '종이를 감고 셀로판테이프로 고정했어요.' : '둥근 머리 볼트에 종이를 감고, 셀로판테이프로 고정해요.' },
+      { n: 2, title: '에나멜선 감기', text: '감은 횟수 <strong>' + Math.floor(part.turns) + '</strong>번' + (st <= 2 ? ' · 한쪽 방향으로 촘촘히 ' + GOOD_TURNS + '번 정도' : '') },
+      { n: 3, title: '양쪽 끝부분 문지르기', text: '왼쪽 끝 ' + pct(part.sand[0]) + ' · 오른쪽 끝 ' + pct(part.sand[1]) }
     ];
     stepsEl.innerHTML = items.map(function (it) {
       var cls = st > it.n ? ' is-done' : st === it.n ? ' is-current' : '';
@@ -184,7 +183,7 @@
   function renderControls() {
     var st = stage();
     var btns = [];
-    if (st === 1) btns.push(part.paper ? ['tape', '셀로판테이프 붙이기', false, true] : ['paper', '종이 감기', false, true]);
+    if (st === 1) btns.push(part.paper ? ['tape', '셀로판테이프로 고정하기', false, true] : ['paper', '종이 감기', false, true]);
     if (st === 2) {
       btns.push(['wind', '한 바퀴 감기', part.turns >= MAX_TURNS]);
       btns.push(['cut', '다 감았어요 · 자르기', part.turns < MIN_TURNS, true]);
@@ -206,13 +205,14 @@
 
   function renderTip() {
     var st = stage(), text;
-    if (st === 1) text = part.paper ? '종이가 풀리지 않게 셀로판테이프로 붙여요.' : '먼저 볼트에 종이를 감아요.';
-    else if (st === 2 && part.turns < MIN_TURNS) text = '볼트 머리의 손잡이를 잡고 화살표 방향으로 빙글빙글 돌려요. 한 바퀴에 ' + TURNS_PER_REV + '번씩 감기고, 반대로 돌리면 풀려요.';
-    else if (st === 2 && part.turns < GOOD_TURNS) text = '더 감아도 돼요. 다 감았으면 ‘다 감았어요 · 자르기’를 눌러요.';
-    else if (st === 2 && part.turns >= MAX_TURNS) text = '볼트에 더 감을 자리가 없어요. ‘다 감았어요 · 자르기’를 눌러 에나멜선을 잘라요.';
-    else if (st === 2) text = '잘 감았어요! 더 감거나 ‘다 감았어요 · 자르기’를 눌러 에나멜선을 잘라요.';
-    else if (st === 3) text = '에나멜선은 구리 선에 전기가 잘 흐르지 않는 물질을 얇게 입힌 전선이에요. 사포를 끌어 양 끝을 문질러 겉면을 벗겨요.';
-    else text = '전자석을 다 만들었어요! ‘테이블에 놓기’를 누르고 전기 회로에 연결해 보세요.';
+    if (st === 1) text = part.paper ? '종이가 풀리지 않게 셀로판테이프로 고정해요.' : '먼저 둥근 머리 볼트에 종이를 감아요.';
+    else if (st === 2 && part.turns < MIN_TURNS) text = '볼트 머리의 손잡이를 화살표 방향으로 돌려 종이 위에 에나멜선을 한쪽 방향으로 촘촘히 감아요. 한 바퀴에 ' + TURNS_PER_REV + '번씩 감기고, 반대로 돌리면 풀려요.';
+    else if (st === 2 && part.turns < GOOD_TURNS - 10) text = GOOD_TURNS + '번 정도 감아요. 다 감았으면 끝부분을 5 cm 정도 남기고 ‘다 감았어요 · 자르기’를 눌러요.';
+    else if (st === 2 && part.turns <= GOOD_TURNS + 10) text = GOOD_TURNS + '번 정도 감았어요! 끝부분을 5 cm 정도 남기고 ‘다 감았어요 · 자르기’를 눌러 잘라요.';
+    else if (st === 2 && part.turns < MAX_TURNS) text = GOOD_TURNS + '번보다 많이 감았어요. 이대로 잘라도 되고, 손잡이를 반대로 돌려 풀어도 돼요.';
+    else if (st === 2) text = '볼트에 더 감을 자리가 없어요. 끝부분을 5 cm 정도 남기고 ‘다 감았어요 · 자르기’를 눌러요.';
+    else if (st === 3) text = '에나멜선은 구리 선에 전기가 잘 흐르지 않는 물질을 얇게 입힌 전선이에요. 사포를 끌어 양쪽 끝부분을 문질러 코팅된 부분을 벗겨요.';
+    else text = '전자석을 다 만들었어요! ‘테이블에 놓기’를 누르고, 코팅을 벗긴 끝부분을 전기 회로에 연결해 보세요.';
     if (tipEl.textContent !== text) tipEl.textContent = text;
   }
 

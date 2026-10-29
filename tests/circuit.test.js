@@ -286,7 +286,7 @@ test('에나멜선 양 끝을 다 벗긴 전자석에만 전기가 흐른다', (
   assert.equal(make([0, 0]).magnets.mag.current, 0);
   assert.equal(make([1, 0.6]).magnets.mag.current, 0);
   assert.ok(make([1, 1]).magnets.mag.current > 0.6);
-  // 겉면이 남아 전기가 흐르지 않을 뿐 합선은 아니다
+  // 코팅이 남아 전기가 흐르지 않을 뿐 합선은 아니다
   assert.equal(make([1, 0]).shorted, false);
   // 따로 적지 않은 전자석(이미 만든 전자석)은 벗긴 것으로 본다
   assert.ok(make(undefined).magnets.mag.current > 0.6);
