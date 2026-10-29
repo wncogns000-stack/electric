@@ -13,6 +13,8 @@
  *     ctx.madeMagnet()           둥근 머리 볼트로 전자석을 다 만들었는지 (에나멜선 양쪽 끝부분의 코팅까지 벗김)
  *     ctx.magnetRings()          둥근 철 고리 옆에서 전자석이 꺼져 있음('off')/전지 한 개·두 개로 켜짐('one', 'two')
  *     ctx.compassSides(memo)     전자석 옆 나침반으로 관찰한 전류 방향 ('fwd', 'rev')
+ *
+ * coilTurns: 전자석 작업대에서 에나멜선을 자를 수 있는 감은 횟수 [최소, 최대]. 최대보다 더 감기지 않는다.
  */
 (function (root) {
   'use strict';
@@ -93,6 +95,8 @@
       title: '전자석의 성질이 궁금해!',
       pages: '64~66쪽',
       tools: ['battery', 'holder', 'switch', 'wire', 'bolt', 'rings', 'compass'],
+      // 『실험관찰』 40쪽: 에나멜선을 100번 정도 감는다
+      coilTurns: [90, 110],
       missions: [
         {
           id: 'l3-make',
@@ -147,6 +151,8 @@
       note: '모든 실험 도구를 꺼내 쓸 수 있어요. 궁금한 전기 회로를 직접 만들어 보세요.',
       tools: ['battery', 'holder', 'bulb', 'socket', 'switch', 'wire', 'motor', 'buzzer',
         'rodPlastic', 'rodRubber', 'rodMetal', 'magnet', 'bolt', 'rings', 'compass'],
+      // 감은 횟수에 따라 전자석의 세기가 어떻게 달라지는지 시험해 볼 수 있게 넓게 둔다
+      coilTurns: [50, 200],
       missions: []
     }
   ];

@@ -11,8 +11,8 @@
 (function (root) {
   'use strict';
 
-  var MIN_TURNS = 50;      // 이만큼은 감아야 자를 수 있다
-  var GOOD_TURNS = 100;
+  var MIN_TURNS = 50;      // 이만큼은 감아야 전자석이 된다
+  var GOOD_TURNS = 100;    // 『실험관찰』의 ‘100번 정도’
   var MAX_TURNS = 200;     // 볼트에 두 겹까지 감을 수 있다
   var TURNS_PER_REV = 10;  // 손잡이를 한 바퀴 돌리면 감기는 횟수 (실제보다 많이 감긴다)
   var SAND_WORK = 420;     // 사포를 이만큼(작업대 좌표) 문지르면 코팅이 다 벗겨진다
@@ -37,6 +37,8 @@
 
   var part = null;
   var hooks = null;
+  var lo = MIN_TURNS;      // 차시마다 자를 수 있는 감은 횟수 범위 (lessons.js의 coilTurns)
+  var hi = MAX_TURNS;
   var drag = null;
   var sandAt = null;
 
@@ -185,8 +187,8 @@
     var btns = [];
     if (st === 1) btns.push(part.paper ? ['tape', '셀로판테이프로 고정하기', false, true] : ['paper', '종이 감기', false, true]);
     if (st === 2) {
-      btns.push(['wind', '한 바퀴 감기', part.turns >= MAX_TURNS]);
-      btns.push(['cut', '다 감았어요 · 자르기', part.turns < MIN_TURNS, true]);
+      btns.push(['wind', '한 바퀴 감기', part.turns >= hi]);
+      btns.push(['cut', '다 감았어요 · 자르기', part.turns < lo, true]);
     }
     if (st === 3) {
       btns.push(['sand0', '왼쪽 끝 문지르기', part.sand[0] >= 1]);
@@ -206,10 +208,10 @@
   function renderTip() {
     var st = stage(), text;
     if (st === 1) text = part.paper ? '종이가 풀리지 않게 셀로판테이프로 고정해요.' : '먼저 둥근 머리 볼트에 종이를 감아요.';
-    else if (st === 2 && part.turns < MIN_TURNS) text = '볼트 머리의 손잡이를 화살표 방향으로 돌려 종이 위에 에나멜선을 한쪽 방향으로 촘촘히 감아요. 한 바퀴에 ' + TURNS_PER_REV + '번씩 감기고, 반대로 돌리면 풀려요.';
+    else if (st === 2 && part.turns < Math.min(lo, GOOD_TURNS - 10)) text = '볼트 머리의 손잡이를 화살표 방향으로 돌려 종이 위에 에나멜선을 한쪽 방향으로 촘촘히 ' + GOOD_TURNS + '번 정도 감아요. 한 바퀴에 ' + TURNS_PER_REV + '번씩 감기고, 반대로 돌리면 풀려요.';
     else if (st === 2 && part.turns < GOOD_TURNS - 10) text = GOOD_TURNS + '번 정도 감아요. 다 감았으면 끝부분을 5 cm 정도 남기고 ‘다 감았어요 · 자르기’를 눌러요.';
     else if (st === 2 && part.turns <= GOOD_TURNS + 10) text = GOOD_TURNS + '번 정도 감았어요! 끝부분을 5 cm 정도 남기고 ‘다 감았어요 · 자르기’를 눌러 잘라요.';
-    else if (st === 2 && part.turns < MAX_TURNS) text = GOOD_TURNS + '번보다 많이 감았어요. 이대로 잘라도 되고, 손잡이를 반대로 돌려 풀어도 돼요.';
+    else if (st === 2 && part.turns < hi) text = GOOD_TURNS + '번보다 많이 감았어요. 이대로 잘라도 되고, 손잡이를 반대로 돌려 풀어도 돼요.';
     else if (st === 2) text = '볼트에 더 감을 자리가 없어요. 끝부분을 5 cm 정도 남기고 ‘다 감았어요 · 자르기’를 눌러요.';
     else if (st === 3) text = '에나멜선은 구리 선에 전기가 잘 흐르지 않는 물질을 얇게 입힌 전선이에요. 사포를 끌어 양쪽 끝부분을 문질러 코팅된 부분을 벗겨요.';
     else text = '전자석을 다 만들었어요! ‘테이블에 놓기’를 누르고, 코팅을 벗긴 끝부분을 전기 회로에 연결해 보세요.';
@@ -234,7 +236,7 @@
     if (hooks && hooks.onChange) hooks.onChange(part);
   }
 
-  function wind(n) { part.turns = clamp(part.turns + n, 0, MAX_TURNS); }
+  function wind(n) { part.turns = clamp(part.turns + n, 0, hi); }
   function sandBy(k, amount) { part.sand[k] = clamp(part.sand[k] + amount, 0, 1); }
 
   function toLocal(e) {
@@ -253,7 +255,7 @@
     if (act === 'paper') part.paper = true;
     if (act === 'tape') part.tape = true;
     if (act === 'wind') wind(TURNS_PER_REV);
-    if (act === 'cut' && part.turns >= MIN_TURNS) part.cut = true;
+    if (act === 'cut' && part.turns >= lo) part.cut = true;
     if (act === 'sand0') sandBy(0, 0.25);
     if (act === 'sand1') sandBy(1, 0.25);
     // 자른 에나멜선은 이어 감을 수 없으므로 풀어 내고 처음부터 다시 감는다
@@ -342,10 +344,14 @@
     '<circle cx="2" cy="2" r=".9" fill="#8f6b3a"/><circle cx="5.5" cy="5" r=".7" fill="#7a5a30"/></pattern>'
   ].join('');
 
-  // part: 작업할 볼트. hooks.onChange(part): 작업할 때마다, hooks.onClose(part): 작업대를 닫을 때
+  // part: 작업할 볼트. hooks.turns: 자를 수 있는 감은 횟수 [최소, 최대] (없으면 50~200번)
+  // hooks.onChange(part): 작업할 때마다, hooks.onClose(part): 작업대를 닫을 때
   function open(p, h) {
     part = p;
     hooks = h || {};
+    var range = hooks.turns || [MIN_TURNS, MAX_TURNS];
+    lo = Math.max(MIN_TURNS, range[0]);
+    hi = Math.min(MAX_TURNS, range[1]);
     if (!part.sand) part.sand = [0, 0];
     if (part.turns === undefined) part.turns = 0;
     drag = null;

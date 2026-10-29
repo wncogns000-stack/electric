@@ -298,9 +298,12 @@
     return b && b.on ? clamp(b.voltage / 3, 0.2, 1.3) : 0;
   }
 
-  // 에나멜선을 많이 감을수록 전자석이 세진다. 100번 감은 전자석을 1로 보고, 50번이면 절반, 200번이면 두 배
+  // 에나멜선을 많이 감을수록 전자석이 세진다. 100번 감은 전자석을 1로 보고 감은 횟수에 비례한다 (50번이면 절반, 200번이면 두 배).
+  // 『실험관찰』의 ‘100번 정도’(90~110번)는 모두 100번으로 쳐서 3차시에는 모둠마다 붙는 고리 수가 같게 한다.
   function coilFactor(m) {
-    return clamp((m.turns === undefined ? 100 : m.turns) / 100, 0.5, 2);
+    var turns = m.turns === undefined ? 100 : m.turns;
+    if (turns >= 90 && turns <= 110) turns = 100;
+    return clamp(turns / 100, 0.5, 2);
   }
 
   // 전자석, 둥근 철 고리, 나침반
@@ -482,7 +485,7 @@
     state.actionsOpen = false;
     hideToast();
     update();
-    window.LabBench.open(p, { onChange: update, onClose: finishBench });
+    window.LabBench.open(p, { turns: lesson().coilTurns, onChange: update, onClose: finishBench });
   }
 
   // 작업대를 닫으면 다 감고 자른 볼트는 전자석이 되고, 다시 감으려고 푼 전자석은 볼트로 돌아간다
