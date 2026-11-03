@@ -473,6 +473,109 @@ button, input { font: inherit; color: inherit; }
   cursor: pointer;
 }
 
+/* ---------- 학급 기록판 ---------- */
+.classboard {
+  display: grid;
+  gap: 6px;
+  padding: 10px 12px;
+  border-radius: 12px;
+  border: 1px solid var(--line);
+  background: var(--panel-2);
+}
+.class-state {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 4px 8px;
+  margin: 0;
+  font-size: var(--step--1);
+}
+.class-state b { font-weight: 600; }
+.dot {
+  flex: none;
+  align-self: center;
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  background: var(--muted);
+}
+.dot-on { background: var(--safe); box-shadow: 0 0 0 4px rgba(53, 208, 127, 0.22); }
+.dot-off { background: var(--danger); }
+.class-warn { color: var(--muted); font-size: 0.75rem; }
+.class-notice { margin: 0; color: var(--hazard); font-size: var(--step--1); font-weight: 600; }
+.class-tools { display: flex; justify-content: flex-end; }
+.name-msg { margin: 0; color: var(--danger); font-size: var(--step--1); font-weight: 600; }
+.records-sum { margin-left: 6px; font-weight: 500; }
+.records-me { margin-top: 6px !important; }
+.records-me li { border: 1px dashed var(--hazard); outline: 0 !important; }
+.send-state { margin: 0 0 8px; font-size: var(--step--1); color: var(--muted); }
+.send-state.is-ok { color: var(--safe); }
+.send-state.is-ok b { font-size: var(--step-1); }
+.send-state.is-bad { color: var(--danger); }
+
+/* ---------- 교사용 ---------- */
+.teacher {
+  width: min(560px, calc(100% - 24px));
+  max-height: calc(100% - 24px);
+  padding: 0;
+  border: 1px solid var(--line);
+  border-radius: 16px;
+  background: var(--panel);
+  color: var(--ink);
+  box-shadow: var(--shadow);
+}
+.teacher::backdrop { background: rgba(5, 7, 9, 0.7); }
+.teacher-inner { display: flex; flex-direction: column; gap: 12px; padding: 18px; font-size: var(--step--1); }
+.teacher-top { display: flex; align-items: flex-start; justify-content: space-between; gap: 12px; }
+.teacher h2 { margin: 0; font-family: var(--font-display); font-weight: 400; font-size: var(--step-2); color: var(--hazard); }
+.teacher h3 { margin: 4px 0 0; font-size: var(--step--1); color: var(--muted); font-weight: 600; }
+.teacher-login { display: grid; gap: 6px; }
+.teacher-login label { font-weight: 600; color: var(--muted); }
+.teacher-login small { font-weight: 500; margin-left: 6px; }
+.teacher-panel { display: flex; flex-direction: column; gap: 10px; }
+.teacher-row { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; }
+.teacher input,
+.teacher select {
+  min-height: 40px;
+  padding: 0 10px;
+  border-radius: 10px;
+  border: 1px solid var(--line);
+  background: var(--bg);
+  color: var(--ink);
+  font: inherit;
+}
+.teacher .start-row input { flex: 1; min-width: 0; min-height: 44px; }
+.btn-open { background: var(--safe); border-color: var(--safe); color: var(--safe-ink); }
+.slot-list { display: grid; gap: 6px; margin: 0; padding: 0; list-style: none; }
+.slot {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 2px 10px;
+  align-items: center;
+  padding: 7px 10px;
+  border-radius: 10px;
+  border: 1px solid var(--line);
+  background: var(--panel-2);
+}
+.slot-time { font-weight: 600; font-variant-numeric: tabular-nums; }
+.slot-memo { grid-column: 1; color: var(--muted); font-size: 0.75rem; }
+.slot .link-btn { grid-column: 2; grid-row: 1 / span 2; }
+.slot.is-live { border-color: var(--safe); }
+.slot.is-past { opacity: 0.6; }
+.slot.is-empty { display: block; color: var(--muted); }
+.teacher-counts { margin: 0; }
+.teacher-msg { margin: 0; min-height: 1.4em; color: var(--muted); font-weight: 600; }
+.teacher-msg[data-tone="ok"] { color: var(--safe); }
+.teacher-msg[data-tone="bad"] { color: var(--danger); }
+.visually-hidden {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip: rect(0 0 0 0);
+  white-space: nowrap;
+}
+
 /* ---------- 폭발 ---------- */
 .boom {
   position: absolute;

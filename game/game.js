@@ -3,7 +3,8 @@
  *
  * 폭탄마다 bomb.js가 고장 난 정지 회로를 만들어 준다. 학생이 회로를 고쳐 정지 램프(전구)에
  * 불이 켜지면 폭탄이 멈추고, 제한 시간이 다 되면 터져서 한 판이 끝난다.
- * 기록은 이 기기의 브라우저(localStorage)에만 남는다.
+ * 기록은 이 기기의 브라우저(localStorage)에 남는다. 학급 기록판(board.js, config.js)을 연결하면
+ * 기록이 구글 시트에 모여 학급 순위가 되고, 교사가 정한 도전 시간에만 출동할 수 있다.
  *
  * 상태를 고치면 update()를 불러 회로를 다시 계산하고 판을 다시 그린다 (실험실 화면과 같은 방식).
  */
@@ -12,6 +13,7 @@
 
   var P = window.LabParts;
   var B = window.LabBomb;
+  var BB = window.BombBoard || { enabled: false };
   var TYPES = P.TYPES;
 
   var SNAP = 34;          // 집게를 놓았을 때 단자에 물리는 거리 (판 좌표)
@@ -21,6 +23,8 @@
   var HINT_SHOW = 4000;
   var STORE_KEY = 'bomb-squad-v1';
   var MAX_RECORDS = 10;
+  var CLASS_POLL = 30000; // 학급 기록판을 다시 받아 오는 간격 (첫 화면과 결과 화면에서만)
+  var PIN_KEY = 'bomb-squad-pin';
   var WIRE_COLORS = ['#d2382d', '#26292c', '#e2b21c', '#2f6fd0', '#2e9a58'];
   var SPARES = [
     { item: 'battery', label: '새 전지' },
@@ -43,6 +47,7 @@
     score: 0,
     remaining: 0,
     name: '',
+    runId: '',           // 학급 기록판이 같은 판을 두 번 적지 않게 판마다 붙이는 번호
     selected: null,      // { kind: 'clip', wireId, end } | { kind: 'term', partId, term } | { kind: 'spare', item } | { kind: 'part', id } | { kind: 'wire', id }
     actionsOpen: false,
     wasShorted: false,
@@ -53,6 +58,9 @@
     rank: -1
   };
   var store = loadStore();
+  var cls = { st: null, error: '', loading: false, all: false, sent: null };   // 학급 기록판에서 받은 상태
+  var teacher = { pin: '', st: null, busy: false, resetArmed: null };
+  var clsEdge = null;
   var result = null;
   var drag = null;
   var nearTerm = null;
@@ -663,7 +671,7 @@
 
   function renderHud() {
     $('score').textContent = G.score;
-    $('best').textContent = Math.max(bestScore(), G.phase === 'intro' ? 0 : G.score);
+    $('best').textContent = Math.max(myBest(), G.phase === 'intro' ? 0 : G.score);
     var playing = G.phase === 'playing';
     hintBtn.disabled = !playing || G.remaining < (PENALTY + 1) * 1000 || !!G.hint;
     quitBtn.hidden = !(playing || G.phase === 'cleared');
@@ -1113,6 +1121,7 @@
     G.name = nameInput.value.trim().slice(0, 12);
     store.name = G.name;
     saveStore();
+    G.runId = Date.now().toString(36) + Math.random().toString(36).slice(2, 8);
     G.seed = Math.floor(Math.random() * 1e9);
     G.run = B.createRun(G.seed);
     G.score = 0;
@@ -1206,18 +1215,21 @@
   }
 
   function finishRun() {
-    var best = bestScore();
-    G.rank = G.score > 0 ? addRecord(G.name, G.score) : -1;
+    var best = myBest();
     G.newBest = G.score > 0 && G.score > best;
+    if (BB.enabled) sendRun();
+    else G.rank = G.score > 0 ? addRecord(G.name, G.score) : -1;
     var boom = G.endReason === 'boom';
     $('overEyebrow').textContent = boom ? '폭발' : '작전 종료';
     $('overTitle').textContent = boom ? '펑! 폭탄이 터졌어요' : '작전을 마쳤어요';
     $('finalScore').textContent = G.score;
     $('newBest').hidden = !G.newBest;
+    $('newBest').textContent = BB.enabled ? '내 최고 기록!' : '이 기기 최고 기록!';
     $('overCauses').innerHTML = boom
       ? '<p class="sub">빨간 동그라미가 이 폭탄의 고장 난 곳이에요.</p><ul class="causes">' + causesHtml(G.puzzle.faults, true) + '</ul>'
       : '';
-    $('overRecords').innerHTML = recordsHtml(G.rank);
+    if (BB.enabled) renderOverClass();
+    else $('overRecords').innerHTML = recordsHtml(G.rank);
     hideOverlays();
     overEl.hidden = false;
     stage.classList.add('is-over');
@@ -1246,22 +1258,194 @@
     G.puzzle = B.createRun(20261028).next(layoutKind());
     G.remaining = G.puzzle.timeLimit * 1000;
     nameInput.value = store.name;
-    $('introRecords').innerHTML = recordsHtml(-1) +
-      (store.records.length ? '<div class="records-tools"><button type="button" class="link-btn" id="clearRecords">이 기기 기록 지우기</button></div>' : '');
+    nameProblem('');
+    if (BB.enabled) {
+      cls.sent = null;
+      renderClass();
+      refreshClass();
+    } else {
+      $('introRecords').innerHTML = recordsHtml(-1) +
+        (store.records.length ? '<div class="records-tools"><button type="button" class="link-btn" id="clearRecords">이 기기 기록 지우기</button></div>' : '');
+    }
     hideOverlays();
     introEl.hidden = false;
     renderCasing();
     update();
   }
 
+  /* ---------- 학급 기록판 ---------- */
+
+  // 띄어쓰기와 대소문자만 다른 이름은 같은 사람으로 본다 (기록판과 같은 규칙)
+  function nameKey(name) { return String(name || '').replace(/\s+/g, '').toLowerCase(); }
+
+  // 학급 기록판에서는 이 이름의 최고 기록, 아니면 이 기기의 최고 기록
+  function myBest() {
+    if (!BB.enabled) return bestScore();
+    var me = cls.st && cls.st.me;
+    var name = G.phase === 'intro' ? nameInput.value : G.name;
+    return me && nameKey(me.name) === nameKey(name) ? me.best : 0;
+  }
+
+  function isOpen(st) {
+    return !!(st && st.open && (st.until === null || BB.now() < st.until));
+  }
+
+  function sameDay(a, b) {
+    return a.getFullYear() === b.getFullYear() && a.getMonth() === b.getMonth() && a.getDate() === b.getDate();
+  }
+  // 오늘(또는 기준 날)이면 ‘오후 2:40’, 다른 날이면 ‘11월 5일(목) 오전 9:00’
+  function clockText(ms, base) {
+    var d = new Date(ms);
+    var time = d.toLocaleTimeString('ko-KR', { hour: 'numeric', minute: '2-digit' });
+    if (sameDay(d, new Date(base === undefined ? BB.now() : base))) return time;
+    return (d.getMonth() + 1) + '월 ' + d.getDate() + '일(' + '일월화수목금토'.charAt(d.getDay()) + ') ' + time;
+  }
+
+  function stateHtml(st, error) {
+    if (!st) {
+      if (error) return '<span class="dot dot-off"></span><span>' + esc(error) + ' <button type="button" class="link-btn" data-class="retry">다시 연결</button></span>';
+      return '<span class="dot"></span><span>학급 기록판에 연결하는 중…</span>';
+    }
+    var html = isOpen(st)
+      ? '<span class="dot dot-on"></span><span><b>지금 도전할 수 있어요</b> · ' + (st.until === null ? '선생님이 닫을 때까지' : clockText(st.until) + '까지') + '</span>'
+      : '<span class="dot dot-off"></span><span><b>지금은 도전할 수 없어요</b> · ' + (st.next ? clockText(st.next) + '에 열려요' : '선생님이 도전 시간을 열면 출동할 수 있어요') + '</span>';
+    if (error) html += '<span class="class-warn">연결이 잠깐 끊겼어요</span>';
+    return html;
+  }
+
+  function classRecordsHtml(st, name) {
+    if (!st) return '';
+    if (!st.board.length) return '<p class="records-empty">아직 우리 반 기록이 없어요. 첫 기록을 세워 보세요!</p>';
+    var key = nameKey(name);
+    var rows = st.board.slice(0, cls.all ? st.board.length : 10);
+    function line(p) {
+      return '<li' + (key && nameKey(p.name) === key ? ' class="is-me"' : '') + '><span class="rank">' + p.rank + '</span>' +
+        '<span class="who">' + esc(p.name) + '</span><span class="pts">' + p.best + '개</span>' +
+        '<span class="when">' + p.tries + '번 도전</span></li>';
+    }
+    var shown = key && rows.some(function (p) { return nameKey(p.name) === key; });
+    return '<h3>우리 반 순위 <span class="records-sum">참가 ' + st.players + '명 · 도전 ' + st.runs + '번</span></h3>' +
+      '<ol>' + rows.map(line).join('') + '</ol>' +
+      (st.me && !shown ? '<ol class="records-me">' + line(st.me) + '</ol>' : '') +
+      (st.board.length > 10 ? '<div class="records-tools"><button type="button" class="link-btn" data-class="all">' +
+        (cls.all ? '10위까지만 보기' : st.board.length + '위까지 모두 보기') + '</button></div>' : '');
+  }
+
+  function renderClass() {
+    if (!BB.enabled) return;
+    $('classState').innerHTML = stateHtml(cls.st, cls.error);
+    var notice = cls.st && cls.st.notice;
+    $('classNotice').textContent = notice || '';
+    $('classNotice').hidden = !notice;
+    $('startBtn').disabled = !isOpen(cls.st);
+    if (G.phase === 'intro') $('introRecords').innerHTML = classRecordsHtml(cls.st, nameInput.value);
+    if (G.phase === 'over') renderOverClass();
+    renderHud();
+  }
+
+  function renderOverClass() {
+    var s = cls.sent;
+    var note = '';
+    if (s && s.state === 'sending') note = '<p class="send-state">학급 기록판에 기록을 보내는 중…</p>';
+    else if (s && s.state === 'saved') {
+      var me = cls.st && cls.st.me;
+      note = '<p class="send-state is-ok">' + (me ? '학급 순위 <b>' + me.rank + '위</b> · 참가 ' + cls.st.players + '명' : '학급 기록판에 기록했어요.') + '</p>';
+    } else if (s && s.state === 'closed') note = '<p class="send-state is-bad">도전 시간이 끝나서 이번 기록은 남지 않았어요.</p>';
+    else if (s) note = '<p class="send-state is-bad">' + esc(s.message || '기록을 보내지 못했어요. 인터넷이 연결되면 다시 보낼게요.') + '</p>';
+    $('overRecords').innerHTML = note + classRecordsHtml(cls.st, G.name);
+    var again = $('againBtn');
+    again.disabled = !isOpen(cls.st);
+    again.textContent = again.disabled ? '도전 시간이 아니에요' : '다시 도전';
+  }
+
+  // 이번 판의 기록을 보낸다. 못 보낸 기록은 board.js가 기기에 두었다가 다시 보낸다
+  function sendRun() {
+    cls.sent = { state: 'sending' };
+    BB.submit({ name: G.name, score: G.score, run: G.runId }).then(function (data) {
+      if (data.ok) {
+        cls.st = data;
+        cls.error = '';
+        cls.sent = { state: 'saved' };
+        armEdge();
+      } else {
+        cls.sent = { state: data.error === 'closed' ? 'closed' : 'failed', message: data.message };
+      }
+    }, function () {
+      cls.sent = { state: 'failed' };
+    }).then(renderClass);
+  }
+
+  function refreshClass() {
+    if (!BB.enabled || cls.loading) return;
+    cls.loading = true;
+    BB.flush().then(function () {
+      return BB.status(G.phase === 'intro' ? nameInput.value.trim() : G.name);
+    }).then(function (st) {
+      if (st.ok) {
+        cls.st = st;
+        cls.error = '';
+      } else {
+        cls.error = st.message || '학급 기록판에서 답을 받지 못했어요.';
+      }
+    }, function () {
+      cls.error = '학급 기록판에 연결하지 못했어요. 인터넷 연결을 확인해 보세요.';
+    }).then(function () {
+      cls.loading = false;
+      armEdge();
+      renderClass();
+    });
+  }
+
+  // 도전 시간이 열리거나 닫히는 때에 맞춰 화면을 바꾸고 다시 받아 온다
+  function armEdge() {
+    clearTimeout(clsEdge);
+    var st = cls.st;
+    var at = st ? (st.open ? st.until : st.next) : null;
+    if (at === null || at === undefined) return;
+    var wait = at - BB.now() + 800;
+    if (wait > 0 && wait < 2147483647) clsEdge = setTimeout(function () { renderClass(); refreshClass(); }, wait);
+  }
+
+  function nameProblem(text) {
+    $('nameMsg').textContent = text || '';
+    $('nameMsg').hidden = !text;
+  }
+
   /* ---------- 단추 ---------- */
 
   $('startForm').addEventListener('submit', function (e) {
     e.preventDefault();
+    if (!nameInput.value.trim()) {
+      nameProblem('이름을 적어야 출동할 수 있어요.');
+      nameInput.focus();
+      return;
+    }
+    if (BB.enabled && !isOpen(cls.st)) {
+      nameProblem('지금은 도전 시간이 아니에요.');
+      return;
+    }
+    nameProblem('');
     startGame();
   });
+  nameInput.addEventListener('input', function () { if (nameInput.value.trim()) nameProblem(''); });
+  // 이름을 다 적으면 학급 순위에서 내 기록을 찾아 보여 준다
+  nameInput.addEventListener('change', function () { if (BB.enabled) refreshClass(); });
   $('nextBtn').addEventListener('click', function () { if (G.phase === 'cleared') nextBomb(); });
-  $('againBtn').addEventListener('click', function () { nameInput.value = G.name; startGame(); });
+  $('againBtn').addEventListener('click', function () {
+    nameInput.value = G.name;
+    if (BB.enabled && !isOpen(cls.st)) return;
+    startGame();
+  });
+
+  document.addEventListener('click', function (e) {
+    var b = e.target.closest('[data-class]');
+    if (!b) return;
+    if (b.getAttribute('data-class') === 'retry') refreshClass();
+    if (b.getAttribute('data-class') === 'all') {
+      cls.all = !cls.all;
+      renderClass();
+    }
+  });
   $('homeBtn').addEventListener('click', showIntro);
   quitBtn.addEventListener('click', quit);
 
@@ -1305,6 +1489,144 @@
 
   document.addEventListener('visibilitychange', function () {
     if (!document.hidden && G.phase === 'playing') startClock();
+    if (!document.hidden && BB.enabled && (G.phase === 'intro' || G.phase === 'over')) refreshClass();
+  });
+
+  /* ---------- 교사용: 도전 시간 관리 ---------- */
+
+  var tDialog = $('teacherDialog');
+  var DONE = {
+    open: '도전 시간을 열었어요.',
+    close: '도전 시간을 닫았어요.',
+    add: '도전 시간을 예약했어요.',
+    remove: '도전 시간을 지웠어요.',
+    reset: '지금까지의 기록을 보관 탭으로 옮기고 기록판을 새로 시작했어요.'
+  };
+
+  function teacherMsg(text, tone) {
+    $('teacherMsg').textContent = text || '';
+    $('teacherMsg').setAttribute('data-tone', tone || '');
+  }
+  function pad2(n) { return (n < 10 ? '0' : '') + n; }
+
+  function renderTeacher() {
+    var st = teacher.st;
+    $('teacherLogin').hidden = !!st;
+    $('teacherPanel').hidden = !st;
+    tDialog.querySelectorAll('[data-op]').forEach(function (b) { b.disabled = teacher.busy; });
+    if (!st) return;
+    var now = BB.now();
+    $('teacherState').innerHTML = stateHtml(st, '');
+    $('slotList').innerHTML = st.windows.length ? st.windows.map(function (w) {
+      var live = w.start <= now && (w.end === null || now < w.end);
+      var past = w.end !== null && w.end <= now;
+      return '<li class="slot' + (live ? ' is-live' : past ? ' is-past' : '') + '">' +
+        '<span class="slot-time">' + clockText(w.start) + ' ~ ' + (w.end === null ? '닫을 때까지' : clockText(w.end, w.start)) + '</span>' +
+        '<span class="slot-memo">' + esc(w.memo) + (live ? ' · 지금 열림' : past ? ' · 끝남' : '') + '</span>' +
+        (past ? '' : '<button type="button" class="link-btn" data-op="remove" data-row="' + w.row + '" data-start="' + w.start + '"' +
+          (teacher.busy ? ' disabled' : '') + '>지우기</button>') + '</li>';
+    }).join('') : '<li class="slot is-empty">예약한 도전 시간이 없어요.</li>';
+    $('teacherCounts').textContent = '참가 ' + st.players + '명 · 도전 ' + st.runs + '번';
+    if (st.sheetUrl) {
+      $('sheetLink').href = st.sheetUrl;
+      $('sheetLink').hidden = false;
+    }
+  }
+
+  function teacherCall(op, args) {
+    if (teacher.busy) return;
+    teacher.busy = true;
+    teacherMsg(op === 'status' ? '불러오는 중…' : '바꾸는 중…');
+    renderTeacher();
+    BB.admin(teacher.pin, op, args).then(function (st) {
+      teacher.busy = false;
+      if (!st.ok) {
+        if (st.error === 'bad_pin' || st.error === 'no_pin' || st.error === 'locked') {
+          teacher.pin = '';
+          teacher.st = null;
+          try { sessionStorage.removeItem(PIN_KEY); } catch (err) { /* 저장하지 않았으면 지울 것도 없다 */ }
+        }
+        teacherMsg(st.message || '바꾸지 못했어요.', 'bad');
+        renderTeacher();
+        if (st.error === 'stale') teacherCall('status');
+        return;
+      }
+      try { sessionStorage.setItem(PIN_KEY, teacher.pin); } catch (err) { /* 창을 닫기 전까지만 암호를 기억한다 */ }
+      teacher.st = st;
+      cls.st = Object.assign({}, st, { me: op === 'reset' || !cls.st ? null : cls.st.me });
+      cls.error = '';
+      armEdge();
+      renderClass();
+      teacherMsg(DONE[op] || '', 'ok');
+      renderTeacher();
+    }, function () {
+      teacher.busy = false;
+      teacherMsg('학급 기록판에 연결하지 못했어요. 인터넷 연결을 확인해 보세요.', 'bad');
+      renderTeacher();
+    });
+  }
+
+  function openTeacher() {
+    try { teacher.pin = sessionStorage.getItem(PIN_KEY) || ''; } catch (err) { teacher.pin = ''; }
+    // 예약 칸은 다음 10분 단위 시각부터 40분 동안으로 채워 둔다
+    var start = new Date(Math.ceil(BB.now() / 600000) * 600000);
+    var end = new Date(start.getTime() + 40 * 60000);
+    $('slotDate').value = start.getFullYear() + '-' + pad2(start.getMonth() + 1) + '-' + pad2(start.getDate());
+    $('slotStart').value = pad2(start.getHours()) + ':' + pad2(start.getMinutes());
+    $('slotEnd').value = pad2(end.getHours()) + ':' + pad2(end.getMinutes());
+    teacherMsg('');
+    renderTeacher();
+    if (typeof tDialog.showModal === 'function') tDialog.showModal();
+    else tDialog.setAttribute('open', '');
+    if (teacher.pin) teacherCall('status');
+    else $('teacherPin').focus();
+  }
+
+  $('teacherBtn').addEventListener('click', openTeacher);
+  $('teacherClose').addEventListener('click', function () {
+    if (typeof tDialog.close === 'function') tDialog.close();
+    else tDialog.removeAttribute('open');
+  });
+  $('teacherLogin').addEventListener('submit', function (e) {
+    e.preventDefault();
+    teacher.pin = $('teacherPin').value.trim();
+    $('teacherPin').value = '';
+    if (!teacher.pin) {
+      teacherMsg('암호를 적어 주세요.', 'bad');
+      return;
+    }
+    teacherCall('status');
+  });
+  tDialog.addEventListener('click', function (e) {
+    var b = e.target.closest('[data-op]');
+    if (!b || b.disabled || teacher.busy) return;
+    var op = b.getAttribute('data-op');
+    if (op === 'open') teacherCall('open', { minutes: $('openMinutes').value });
+    if (op === 'close') teacherCall('close');
+    if (op === 'remove') teacherCall('remove', { row: b.getAttribute('data-row'), start: b.getAttribute('data-start') });
+    if (op === 'add') {
+      var day = $('slotDate').value;
+      var start = new Date(day + 'T' + $('slotStart').value).getTime();
+      var end = new Date(day + 'T' + $('slotEnd').value).getTime();
+      if (!day || isNaN(start) || isNaN(end)) teacherMsg('날짜와 시작·끝 시각을 모두 정해 주세요.', 'bad');
+      else if (end <= start) teacherMsg('끝 시각이 시작 시각보다 늦어야 해요.', 'bad');
+      else teacherCall('add', { start: start, end: end });
+    }
+    // 기록판 새로 시작은 두 번 눌러야 한다
+    if (op === 'reset') {
+      if (!teacher.resetArmed) {
+        b.textContent = '한 번 더 누르면 지금 기록을 보관하고 새로 시작해요';
+        teacher.resetArmed = setTimeout(function () {
+          teacher.resetArmed = null;
+          b.textContent = '기록판 새로 시작';
+        }, 4000);
+        return;
+      }
+      clearTimeout(teacher.resetArmed);
+      teacher.resetArmed = null;
+      b.textContent = '기록판 새로 시작';
+      teacherCall('reset');
+    }
   });
 
   /* ---------- 화면 크기 ---------- */
@@ -1318,6 +1640,14 @@
   /* ---------- 시작 ---------- */
 
   $('defs').innerHTML = P.DEFS + GAME_DEFS;
+  if (BB.enabled) {
+    $('classBoard').hidden = false;
+    $('classTools').hidden = false;
+    $('bestLabel').textContent = '내 최고 기록';
+    setInterval(function () {
+      if (!document.hidden && (G.phase === 'intro' || G.phase === 'over')) refreshClass();
+    }, CLASS_POLL + Math.floor(Math.random() * 5000));
+  }
   showIntro();
 
   // claude.ai에서 새 판이 올라와도 하던 판을 이어 갈 수 있게 상태를 넘겨준다

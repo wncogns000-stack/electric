@@ -22,7 +22,7 @@
         <dd id="score">0</dd>
       </div>
       <div class="score-chip">
-        <dt>이 기기 최고 기록</dt>
+        <dt id="bestLabel">이 기기 최고 기록</dt>
         <dd id="best">0</dd>
       </div>
     </dl>
@@ -64,14 +64,22 @@
           <li><b>전지 끼우개·전선</b> 누르면 ‘전지 방향 바꾸기’, ‘전선 빼기’ 단추가 나와요.</li>
         </ul>
         <p class="warn">폭탄을 해체할수록 제한 시간이 짧아져요. 합선을 만들면 5초가 줄어요. 한 번 터지면 끝!</p>
-        <form class="start-form" id="startForm">
-          <label for="playerName">별명 또는 번호</label>
+        <section class="classboard" id="classBoard" hidden aria-label="학급 기록판">
+          <div class="class-state" id="classState" role="status" aria-live="polite"></div>
+          <p class="class-notice" id="classNotice" hidden></p>
+        </section>
+        <form class="start-form" id="startForm" novalidate>
+          <label for="playerName">이름</label>
           <div class="start-row">
-            <input id="playerName" name="playerName" maxlength="12" autocomplete="off" placeholder="예: 3번">
-            <button type="submit" class="btn btn-go">출동!</button>
+            <input id="playerName" name="playerName" maxlength="12" autocomplete="off" placeholder="예: 12번 김하늘" aria-describedby="nameMsg">
+            <button type="submit" class="btn btn-go" id="startBtn">출동!</button>
           </div>
+          <p class="name-msg" id="nameMsg" hidden></p>
         </form>
         <div class="records" id="introRecords"></div>
+        <div class="class-tools" id="classTools" hidden>
+          <button type="button" class="link-btn" id="teacherBtn" aria-haspopup="dialog">교사용 · 도전 시간 관리</button>
+        </div>
       </div>
     </section>
 
@@ -102,9 +110,61 @@
   </main>
 </div>
 
+<dialog class="teacher" id="teacherDialog" aria-labelledby="teacherTitle">
+  <div class="teacher-inner">
+    <div class="teacher-top">
+      <h2 id="teacherTitle">교사용 · 도전 시간 관리</h2>
+      <button type="button" class="btn btn-quiet" id="teacherClose">닫기</button>
+    </div>
+    <form class="teacher-login" id="teacherLogin">
+      <label for="teacherPin">교사 암호 <small>구글 시트 ‘설정’ 탭에 적은 암호</small></label>
+      <div class="start-row">
+        <input id="teacherPin" type="password" autocomplete="off" maxlength="40">
+        <button type="submit" class="btn">확인</button>
+      </div>
+    </form>
+    <div class="teacher-panel" id="teacherPanel" hidden>
+      <div class="class-state" id="teacherState"></div>
+      <div class="teacher-row">
+        <label class="visually-hidden" for="openMinutes">열어 둘 시간</label>
+        <select id="openMinutes">
+          <option value="10">10분 동안</option>
+          <option value="20">20분 동안</option>
+          <option value="30">30분 동안</option>
+          <option value="40" selected>40분 동안</option>
+          <option value="0">닫을 때까지</option>
+        </select>
+        <button type="button" class="btn btn-open" data-op="open">지금 열기</button>
+        <button type="button" class="btn" data-op="close">지금 닫기</button>
+      </div>
+      <h3>도전 시간 예약</h3>
+      <div class="teacher-row">
+        <label class="visually-hidden" for="slotDate">날짜</label>
+        <input type="date" id="slotDate">
+        <label class="visually-hidden" for="slotStart">시작 시각</label>
+        <input type="time" id="slotStart">
+        <span aria-hidden="true">~</span>
+        <label class="visually-hidden" for="slotEnd">끝 시각</label>
+        <input type="time" id="slotEnd">
+        <button type="button" class="btn" data-op="add">예약하기</button>
+      </div>
+      <ul class="slot-list" id="slotList"></ul>
+      <h3>기록</h3>
+      <p class="teacher-counts" id="teacherCounts"></p>
+      <div class="teacher-row">
+        <button type="button" class="btn" data-op="reset" id="resetBtn">기록판 새로 시작</button>
+        <a class="link-btn" id="sheetLink" target="_blank" rel="noopener" hidden>구글 시트에서 전체 기록 보기</a>
+      </div>
+    </div>
+    <p class="teacher-msg" id="teacherMsg" role="status" aria-live="polite"></p>
+  </div>
+</dialog>
+
 <script src="../js/circuit.js"></script>
 <script src="../js/parts.js"></script>
 <script src="bomb.js"></script>
+<script src="config.js"></script>
+<script src="board.js"></script>
 <script src="game.js"></script>
 </body>
 </html>
