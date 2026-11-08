@@ -8,5 +8,5 @@
  * 설치 방법: game/server/README.md
  */
 window.BOMB_CONFIG = {
-  board: ''
+  board: 'https://script.google.com/macros/s/AKfycbyMc-iOyksxlJjbUaZcfai7cENo_5dOT6eMy98Coj8srX26JV55e60IvI_HvQ2qEXND/exec'
 };
